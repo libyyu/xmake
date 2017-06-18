@@ -84,7 +84,7 @@ function _make_linkflags(targetinfo, vcxprojdir, vcxprojfile)
                                 path_pre, path_last = k, v or ""
                             end
                             if path_pre then
-                                return path_pre .. targetinfo.mode .. "\\" .. arch .. path_last
+                                return path_pre .. arch .. "\\" .. targetinfo.mode .. path_last
                             else
                                 return dir
                             end
@@ -103,7 +103,7 @@ function _make_linkflags(targetinfo, vcxprojdir, vcxprojfile)
                             path_pre, path_last = k, v or ""
                         end
                         if path_pre then
-                            return "/pdb:" .. path_pre .. targetinfo.mode .. "\\" .. arch .. path_last
+                            return "/pdb:" .. path_pre .. arch .. "\\" .. targetinfo.mode .. path_last
                         else
                             return "/pdb:" .. dir
                         end
@@ -162,18 +162,40 @@ function _make_linkflags(targetinfo, vcxprojdir, vcxprojfile)
     return flags
 end
 
-function _make_entrypointsymbol(targetinfo, vcxprojdir)
-    local entry_symbol = nil
+function _make_ldflags(targetinfo, vcxprojdir, vcxprojfile)
+    local has_dataexeprevention = false
     for _, flag in ipairs(targetinfo.ldflags) do
         if flag:find("[%-|/]ENTRY:\"(.*)\"") then
-            flag:gsub("[%-|/]ENTRY:\"(.*)\"", function(symbol)
+            local entry_symbol = flag:gsub("[%-|/]ENTRY:\"(.*)\"", function(symbol)
                 entry_symbol = symbol:trim()
-                return ""
+                return entry_symbol
             end)
-            break
+            -- make EntryPointSymbol
+            vcxprojfile:print("<EntryPointSymbol>%s</EntryPointSymbol>", entry_symbol)
+        end
+        if flag:find("[%-|/]DYNAMICBASE:(.*)") then
+            local dynamicbase = flag:gsub("[%-|/]DYNAMICBASE:(.*)", function (dir)
+                            dir = dir:trim()
+                            return dir
+                        end)
+            -- make RandomizedBaseAddress
+            vcxprojfile:print("<RandomizedBaseAddress>%s</RandomizedBaseAddress>", dynamicbase == "NO" and "false" or "true")
+        end
+        if flag:find("[%-|/]NXCOMPAT:(.*)") then
+            has_dataexeprevention = true
+            local dataexeprevention = flag:gsub("[%-|/]NXCOMPAT:(.*)", function (dir)
+                            dir = dir:trim()
+                            return dir
+                        end)
+            -- make RandomizedBaseAddress
+            vcxprojfile:print("<DataExecutionPrevention>%s</DataExecutionPrevention>", dataexeprevention == "NO" and "false" or "true")
         end
     end
-    return entry_symbol
+
+    if not has_dataexeprevention then
+        -- make RandomizedBaseAddress: inherit
+        vcxprojfile:print("<DataExecutionPrevention></DataExecutionPrevention>")
+    end
 end
 
 -- make header
@@ -361,17 +383,20 @@ function _make_source_options(vcxprojfile, targetinfo, condition)
     -- make AdditionalOptions
     local includedirs = {}
     local predefinitions = {}
+    local warningsdisables = {}
     local additional_flags = {}
-    local excludes = {"Os", "O0", "O1", "O2", "Ot", "Ox", "W0", "W1", "W2", "W3", "WX", "Wall", "Zi", "ZI", "Z7", "MT", "MTd", "MD", "MDd", "TP", "I", "D" }
+    local excludes = {"Os", "O0", "O1", "O2", "Ot", "Ox", "W0", "W1", "W2", "W3", "WX", "Wall", "Zi", "ZI", "Z7", "MT", "MTd", "MD", "MDd", "TP", "I", "D", "wd" }
     for _, flag in ipairs(flags) do
         local excluded = false
         local is_include_dir = false
         local is_pre_define = false
+        local is_warningd = false
         for _, exclude in ipairs(excludes) do
             if flag:find("[%-|/]" .. exclude) then
                 excluded = true
                 is_include_dir = exclude == "I"
                 is_pre_define = exclude == "D"
+                is_warningd = exclude == "wd"
                 break
             end
         end
@@ -394,6 +419,14 @@ function _make_source_options(vcxprojfile, targetinfo, condition)
             end)
             table.insert(predefinitions, definition)
         end
+        -- warning disables
+        if is_warningd then
+            local warndisable = flag:gsub("[%-|/]wd\"(.*)\"", function(warn)
+                warn = warn:trim()
+                return warn
+            end)
+            table.insert(warningsdisables, warndisable)
+        end
     end
     -- make include path
     local str_includedirs = table.concat(includedirs,";"):trim()
@@ -403,7 +436,11 @@ function _make_source_options(vcxprojfile, targetinfo, condition)
     local str_predefinitions = table.concat(predefinitions,";"):trim()
     vcxprojfile:print("<PreprocessorDefinitions>%s;%%(PreprocessorDefinitions)</PreprocessorDefinitions>", str_predefinitions)
     
+    -- make disableSpecificWarnings
+    local str_warningsdisables = table.concat(warningsdisables,";"):trim()
+    vcxprojfile:print("<DisableSpecificWarnings>%s;%%(DisableSpecificWarnings)</DisableSpecificWarnings>", str_warningsdisables)
 
+    -- make other copmile flags
     vcxprojfile:print("<AdditionalOptions%s>%s %%(AdditionalOptions)</AdditionalOptions>", condition, table.concat(additional_flags, " "):trim())
 end
 
@@ -441,10 +478,7 @@ function _make_common_item(vcxprojfile, vsinfo, targetinfo, vcxprojdir)
             vcxprojfile:print("<TargetMachine>%s</TargetMachine>", ifelse(targetinfo.arch == "x64", "MachineX64", "MachineX86"))
 
             -- make EntryPointSymbol
-            local entry_symbol = _make_entrypointsymbol(targetinfo, vcxprojdir)
-            if entry_symbol then
-                vcxprojfile:print("<EntryPointSymbol>%s</EntryPointSymbol>", entry_symbol)
-            end
+            _make_ldflags(targetinfo, vcxprojdir, vcxprojfile)
 
         vcxprojfile:leave("</Link>")
     end
