@@ -44,6 +44,7 @@ function _make(kind)
     local maps = 
     {
         makefile    = makefile.make
+    ,   mk          = mk.make
     ,   vs2002      = vs2002.make
     ,   vs2003      = vs2003.make
     ,   vs2005      = vs2005.make
