@@ -49,6 +49,9 @@ task("project")
                 ,   {'m', "modes",     "kv", nil,           "Set the project modes." 
                                                        ,    "    .e.g "
                                                        ,    "    - xmake project -k vs2015 -m \"release,debug\"" }
+                ,   {'a', "archs",     "kv", nil,           "Set the project archs." 
+                                                       ,    "    .e.g "
+                                                       ,    "    - xmake project -k mk -a \"x86,armv7-a\"" }
                 ,   {nil, "outputdir", "v",  ".",           "Set the output directory." }
                 }
             }

@@ -65,6 +65,9 @@ function _make_targetinfo(mode, arch, target)
     -- includes
     targetinfo.includedirs = target:get("includedirs")
 
+    -- target dir
+    targetinfo.targetdir = target:get("targetdir")
+
     -- ok
     return targetinfo
 end
@@ -129,6 +132,7 @@ function make(outputdir, vsinfo)
                 _target.kind = target:get("kind")
                 _target.scriptdir = target:scriptdir()
                 _target.info = _target.info or {}
+                _target.target = target
                 table.insert(_target.info, _make_targetinfo(mode, arch, target))
 
                 -- save all sourcefiles and headerfiles

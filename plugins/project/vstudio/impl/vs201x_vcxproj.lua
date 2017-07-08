@@ -32,6 +32,7 @@ function _make_compflags(sourcefile, targetinfo, vcxprojdir)
     -- translate path for -Idir or /Idir, -Fdsymbol.pdb or /Fdsymbol.pdb
     local flags = {}
     for _, flag in ipairs(targetinfo.compflags[sourcefile]) do
+
         -- -Idir or /Idir
         flag = flag:gsub("[%-|/]I(.*)", function (dir)
                         dir = dir:trim()
@@ -78,16 +79,8 @@ function _make_linkflags(targetinfo, vcxprojdir, vcxprojfile)
                             if not path.is_absolute(dir) then
                                 dir = path.relative(path.absolute(dir), vcxprojdir)
                             end
-                            
-                            local path_pre,path_last
-                            for k, v in dir:gmatch("(.*)"..arch.."(.*)") do
-                                path_pre, path_last = k, v or ""
-                            end
-                            if path_pre then
-                                return path_pre .. arch .. "\\" .. targetinfo.mode .. path_last
-                            else
-                                return dir
-                            end
+                            dir = path.relative(path.join(dir, targetinfo.mode), vcxprojdir)                  
+                            return dir
                         end)
             table.insert(lib_paths,flag)
         end
@@ -98,15 +91,7 @@ function _make_linkflags(targetinfo, vcxprojdir, vcxprojfile)
                         if not path.is_absolute(dir) then
                             dir = path.relative(path.absolute(dir), vcxprojdir)
                         end
-                        local path_pre,path_last
-                        for k, v in dir:gmatch("(.*)"..arch.."(.*)") do
-                            path_pre, path_last = k, v or ""
-                        end
-                        if path_pre then
-                            return "/pdb:" .. path_pre .. arch .. "\\" .. targetinfo.mode .. path_last
-                        else
-                            return "/pdb:" .. dir
-                        end
+                        dir = path.relative(dir:gsub("(.*)\\"..arch.."\\(.*)", "%1\\" .. arch .. "\\" .. targetinfo.mode .. "\\%2"), vcxprojdir)
                         return "/pdb:" .. dir
                     end)
 
@@ -149,11 +134,11 @@ function _make_linkflags(targetinfo, vcxprojdir, vcxprojfile)
     
     -- make lib search path
     local str_libdirs = table.concat(lib_paths,";"):trim()
-    vcxprojfile:print("<AdditionalLibraryDirectories>%s;%%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>", str_libdirs)
+    vcxprojfile:print("<AdditionalLibraryDirectories>%s%%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>", #str_libdirs >0 and str_libdirs..";" or "")
     
     -- make libs
     local str_libfiles = table.concat(lib_files,";"):trim()
-    vcxprojfile:print("<AdditionalDependencies>%s;%%(AdditionalDependencies)</AdditionalDependencies>", str_libfiles)
+    vcxprojfile:print("<AdditionalDependencies>%s%%(AdditionalDependencies)</AdditionalDependencies>", #str_libfiles >0 and str_libfiles..";" or "")
     
     -- make AdditionalOptions
     vcxprojfile:print("<AdditionalOptions>%s %%(AdditionalOptions)</AdditionalOptions>", table.concat(flags, " "):trim())
@@ -306,11 +291,19 @@ function _make_configurations(vcxprojfile, vsinfo, target, vcxprojdir)
     -- make OutputDirectory and IntermediateDirectory
     for _, targetinfo in ipairs(target.info) do
         vcxprojfile:enter("<PropertyGroup Condition=\"\'%$(Configuration)|%$(Platform)\'==\'%s|%s\'\">", targetinfo.mode, targetinfo.arch)
-            local relative_path = path.relative(path.absolute("$(plat)"), vcxprojdir) --path.relative(path.absolute(config.get("buildir")), vcxprojdir)
-            vcxprojfile:print("<OutDir>%s\\%s\\%$(Configuration)\\</OutDir>", relative_path, ifelse(targetinfo.arch == "Win32", "x86", targetinfo.arch) )
+            --local relative_path = path.relative(path.absolute(config.get("buildir")), vcxprojdir)
+            --local relative_path = path.relative(path.absolute("$(plat)"), vcxprojdir) 
+            local relative_path = path.relative(targetinfo.targetdir, vcxprojdir)
+            vcxprojfile:print("<OutDir>%s\\%$(Configuration)\\</OutDir>", relative_path)--, ifelse(targetinfo.arch == "Win32", "x86", targetinfo.arch) )
             vcxprojfile:print("<IntDir>%$(Configuration)\\</IntDir>")
-            if target.kind == "binary" then
-                vcxprojfile:print("<LinkIncremental>true</LinkIncremental>")
+            if target.kind == "binary" or target.kind == "shared" then
+                for _, flag in ipairs(targetinfo.ldflags) do
+                    if flag:find("[%-|/]INCREMENTAL") then
+                        -- make LinkIncremental
+                        vcxprojfile:print("<LinkIncremental>true</LinkIncremental>")
+                        break
+                    end
+                end
             end
         vcxprojfile:leave("</PropertyGroup>")
     end
@@ -344,13 +337,46 @@ function _make_source_options(vcxprojfile, targetinfo, condition)
         vcxprojfile:print("<WarningLevel%s>Level2</WarningLevel>", condition) 
     elseif flagstr:find("[%-|/]W3") then
         vcxprojfile:print("<WarningLevel%s>Level3</WarningLevel>", condition) 
+    elseif flagstr:find("[%-|/]W4") then
+        vcxprojfile:print("<WarningLevel%s>Level4</WarningLevel>", condition) 
     elseif flagstr:find("[%-|/]Wall") then
         vcxprojfile:print("<WarningLevel%s>EnableAllWarnings</WarningLevel>", condition) 
     else
         vcxprojfile:print("<WarningLevel%s>TurnOffAllWarnings</WarningLevel>", condition) 
     end
-    if flagstr:find("[%-|/]WX") then
+
+    if flagstr:find("[%-|/]WX%-") then
+        vcxprojfile:print("<TreatWarningAsError%s>false</TreatWarningAsError>", condition) 
+    elseif flagstr:find("[%-|/]WX") then
         vcxprojfile:print("<TreatWarningAsError%s>true</TreatWarningAsError>", condition) 
+    end
+
+    if flagstr:find("[%-|/]MP") then
+        vcxprojfile:print("<MultiProcessorCompilation%s>true</MultiProcessorCompilation>", condition) 
+    end
+
+    if flagstr:find("[%-|/]GF%-") then
+        vcxprojfile:print("<StringPooling%s>false</StringPooling>", condition) 
+    elseif flagstr:find("[%-|/]GF") then
+        vcxprojfile:print("<StringPooling%s>true</StringPooling>", condition) 
+    end
+
+    if flagstr:find("[%-|/]GM%-") then
+        vcxprojfile:print("<MinimalRebuild%s>false</MinimalRebuild>", condition) 
+    elseif flagstr:find("[%-|/]GM") then
+        vcxprojfile:print("<MinimalRebuild%s>true</MinimalRebuild>", condition) 
+    end
+
+    if flagstr:find("[%-|/]Gy%-") then
+        vcxprojfile:print("<FunctionLevelLinking%s>false</FunctionLevelLinking>", condition) 
+    elseif flagstr:find("[%-|/]Gy") then
+        vcxprojfile:print("<FunctionLevelLinking%s>true</FunctionLevelLinking>", condition) 
+    end
+
+    if flagstr:find("[%-|/]Oy%-") then
+        vcxprojfile:print("<OmitFramePointers%s>false</OmitFramePointers>", condition) 
+    elseif flagstr:find("[%-|/]Oy") then
+        vcxprojfile:print("<OmitFramePointers%s>true</OmitFramePointers>", condition) 
     end
 
     -- make DebugInformationFormat
@@ -375,6 +401,17 @@ function _make_source_options(vcxprojfile, targetinfo, condition)
         vcxprojfile:print("<RuntimeLibrary%s>MultiThreaded</RuntimeLibrary>", condition)
     end
 
+    -- make CallingConvention
+    if flagstr:find("[%-|/]Gz") then
+        vcxprojfile:print("<CallingConvention%s>StdCall</CallingConvention>", condition)
+    elseif flagstr:find("[%-|/]Gv") then
+        vcxprojfile:print("<CallingConvention%s>VectorCall</CallingConvention>", condition)
+    elseif flagstr:find("[%-|/]Gr") then
+        vcxprojfile:print("<CallingConvention%s>FastCall</CallingConvention>", condition)
+    elseif flagstr:find("[%-|/]Gd") then
+        vcxprojfile:print("<CallingConvention%s>Cdecl</CallingConvention>", condition)
+    end
+
     -- complie as c++ if exists flag: /TP
     if flagstr:find("[%-|/]TP") then
         vcxprojfile:print("<CompileAs%s>CompileAsCpp</CompileAs>", condition)
@@ -385,7 +422,7 @@ function _make_source_options(vcxprojfile, targetinfo, condition)
     local predefinitions = {}
     local warningsdisables = {}
     local additional_flags = {}
-    local excludes = {"Os", "O0", "O1", "O2", "Ot", "Ox", "W0", "W1", "W2", "W3", "WX", "Wall", "Zi", "ZI", "Z7", "MT", "MTd", "MD", "MDd", "TP", "I", "D", "wd" }
+    local excludes = {"Os", "O0", "O1", "O2", "Ot", "Ox", "Od", "W0", "W1", "W2", "W3", "W4", "WX", "Wall", "Zi", "ZI", "Z7", "MT", "MTd", "MD", "MDd", "TP", "I", "D", "wd", "GF", "MP", "GM", "Gy", "Oy", "Gz", "Gr", "Gd", "Gv" }
     for _, flag in ipairs(flags) do
         local excluded = false
         local is_include_dir = false
@@ -430,15 +467,15 @@ function _make_source_options(vcxprojfile, targetinfo, condition)
     end
     -- make include path
     local str_includedirs = table.concat(includedirs,";"):trim()
-    vcxprojfile:print("<AdditionalIncludeDirectories>%s;%%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>", str_includedirs)
+    vcxprojfile:print("<AdditionalIncludeDirectories>%s%%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>", #str_includedirs>0 and str_includedirs..";" or "")
     
     -- make predefinitions
     local str_predefinitions = table.concat(predefinitions,";"):trim()
-    vcxprojfile:print("<PreprocessorDefinitions>%s;%%(PreprocessorDefinitions)</PreprocessorDefinitions>", str_predefinitions)
+    vcxprojfile:print("<PreprocessorDefinitions>%s%%(PreprocessorDefinitions)</PreprocessorDefinitions>", #str_predefinitions>0 and str_predefinitions..";" or "")
     
     -- make disableSpecificWarnings
     local str_warningsdisables = table.concat(warningsdisables,";"):trim()
-    vcxprojfile:print("<DisableSpecificWarnings>%s;%%(DisableSpecificWarnings)</DisableSpecificWarnings>", str_warningsdisables)
+    vcxprojfile:print("<DisableSpecificWarnings>%s%%(DisableSpecificWarnings)</DisableSpecificWarnings>", #str_warningsdisables>0 and str_warningsdisables..";" or "")
 
     -- make other copmile flags
     vcxprojfile:print("<AdditionalOptions%s>%s %%(AdditionalOptions)</AdditionalOptions>", condition, table.concat(additional_flags, " "):trim())

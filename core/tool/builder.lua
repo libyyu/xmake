@@ -261,7 +261,13 @@ function builder:check(flags)
     end
 
     -- check it
-    local ok, errors = sandbox.load(ctool.check, flags)
+    local ok, errors
+    if flags:find("[%-|/]ENTRY:\"(.*)\"") then
+        ok = true
+    else
+        ok, errors = sandbox.load(ctool.check, flags)
+    end
+    
 
     -- trace
     if option.get("verbose") then

@@ -35,7 +35,7 @@ function init(shellname, kind)
     _g.kind = kind
 
     -- init cxflags
-    _g.cxflags = { "-nologo", "-Gd", "-MP4", "-D_MBCS", "-D_CRT_SECURE_NO_WARNINGS"}
+    _g.cxflags = { "-nologo", "-Gd", "-D_CRT_SECURE_NO_WARNINGS" }--, "-MP4", "-D_MBCS",}
 
     -- init flags map
     _g.mapflags = 
@@ -57,6 +57,7 @@ function init(shellname, kind)
     ,   ["-W1"]                     = "-W1"
     ,   ["-W2"]                     = "-W2"
     ,   ["-W3"]                     = "-W3"
+    ,   ["-W4"]                     = "-W4"
     ,   ["-Werror"]                 = "-WX"
     ,   ["%-Wno%-error=.*"]         = ""
     ,   ["%-fno%-.*"]               = ""
@@ -106,7 +107,11 @@ function nf_symbol(level, target)
         local ok = try
         {
             function ()
-                check("-ZI -FS -Fd" .. os.tmpfile() .. ".pdb")
+                if target and target:get("mode") == "release" then
+                    check("-Zi -FS -Fd" .. os.tmpfile() .. ".pdb")
+                else
+                    check("-ZI -FS -Fd" .. os.tmpfile() .. ".pdb")
+                end
                 return true
             end
         }
@@ -119,7 +124,11 @@ function nf_symbol(level, target)
     local flags = ""
     if level == "debug" then
         if target and target.symbolfile then
-            flags = "-ZI -Fd" .. target:symbolfile() 
+            if target:get("mode") == "release" then
+                flags = "-Zi -Fd" .. target:symbolfile() 
+            else
+                flags = "-ZI -Fd" .. target:symbolfile() 
+            end
             if _g._FS then
                 flags = "-FS " .. flags
             end
@@ -142,6 +151,7 @@ function nf_warning(level)
     ,   less        = "-W1"
     ,   more        = "-W3"
     ,   all         = "-W3" -- = "-Wall" will enable too more warnings
+    ,   level4      = "-W4"
     ,   error       = "-WX"
     }
 

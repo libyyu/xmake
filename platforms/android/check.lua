@@ -28,7 +28,6 @@ import("platforms.checker", {rootdir = os.programdir()})
 
 -- check the sdk version for ndk
 function _check_ndk_sdkver(config)
-
     -- get ndk sdk version
     local ndk_sdkver = config.get("ndk_sdkver")
     if not ndk_sdkver then 
@@ -83,7 +82,6 @@ function _check_toolchains_dir(config)
 
         -- get architecture
         local arch = config.get("arch")
-
         -- get ndk
         local ndk = config.get("ndk")
         if ndk then
@@ -180,7 +178,6 @@ end
 
 -- check it
 function main(kind, toolkind)
-
     -- only check the given tool?
     if toolkind then
         return checker.toolchain_check(import("core.project." .. kind), toolkind, _toolchains)
