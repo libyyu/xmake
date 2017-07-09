@@ -107,7 +107,7 @@ function nf_symbol(level, target)
         local ok = try
         {
             function ()
-                if target and target:get("mode") == "release" then
+                if target and target.targetmode and target:targetmode() == "release" then
                     check("-Zi -FS -Fd" .. os.tmpfile() .. ".pdb")
                 else
                     check("-ZI -FS -Fd" .. os.tmpfile() .. ".pdb")
@@ -124,7 +124,7 @@ function nf_symbol(level, target)
     local flags = ""
     if level == "debug" then
         if target and target.symbolfile then
-            if target:get("mode") == "release" then
+            if target.targetmode and target:targetmode() == "release" then
                 flags = "-Zi -Fd" .. target:symbolfile() 
             else
                 flags = "-ZI -Fd" .. target:symbolfile() 
