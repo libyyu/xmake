@@ -53,6 +53,7 @@ language("c++")
         {
             "config.includedirs"
         ,   "config.frameworks"
+        ,   "config.frameworkdirs"
         ,   "target.symbols"
         ,   "target.warnings"
         ,   "target.optimize:check"
@@ -62,6 +63,7 @@ language("c++")
         ,   "target.defines"
         ,   "target.undefines"
         ,   "target.frameworks"
+        ,   "target.frameworkdirs"
         ,   "option.symbols"
         ,   "option.warnings"
         ,   "option.optimize:check"
@@ -73,10 +75,12 @@ language("c++")
         ,   "option.defines_if_ok"
         ,   "option.undefines_if_ok"
         ,   "option.frameworks"
+        ,   "option.frameworkdirs"
         ,   "platform.includedirs"
         ,   "platform.defines"
         ,   "platform.undefines"
         ,   "platform.frameworks"
+        ,   "platform.frameworkdirs"
         }
     ,   binary =
         {
@@ -93,12 +97,16 @@ language("c++")
         ,   "platform.rpathdirs"
         ,   "config.links"
         ,   "config.frameworks"
+        ,   "config.frameworkdirs"
         ,   "target.links"
         ,   "target.frameworks"
+        ,   "target.frameworkdirs"
         ,   "option.links"
         ,   "option.frameworks"
+        ,   "option.frameworkdirs"
         ,   "platform.links"
         ,   "platform.frameworks"
+        ,   "platform.frameworkdirs"
         }
     ,   shared =
         {
@@ -112,12 +120,16 @@ language("c++")
         ,   "platform.linkdirs"
         ,   "config.links"
         ,   "config.frameworks"
+        ,   "config.frameworkdirs"
         ,   "target.links"
         ,   "target.frameworks"
+        ,   "target.frameworkdirs"
         ,   "option.links"
         ,   "option.frameworks"
+        ,   "option.frameworkdirs"
         ,   "platform.links"
         ,   "platform.frameworks"
+        ,   "platform.frameworkdirs"
         }
     ,   static = 
         {
@@ -153,6 +165,7 @@ language("c++")
                 ,   {nil, "links",      "kv", nil,          "The Link Libraries"                    }
                 ,   {nil, "linkdirs",   "kv", nil,          "The Link Search Directories"           }
                 ,   {nil, "includedirs","kv", nil,          "The Include Search Directories"        }
+                ,   {nil, "frameworkdirs", "kv", nil,          "The Include and Link Frameworks Search Directories" }               
                 }
             }
 

@@ -49,6 +49,7 @@ language("swift")
         object =
         {
             "config.includedirs"
+        ,   "config.frameworkdirs"
         ,   "config.Frameworks"
         ,   "target.symbols"
         ,   "target.warnings"
@@ -58,6 +59,7 @@ language("swift")
         ,   "target.includedirs"
         ,   "target.defines"
         ,   "target.undefines"
+        ,   "target.frameworkdirs"
         ,   "target.frameworks"
         ,   "option.symbols"
         ,   "option.warnings"
@@ -69,29 +71,35 @@ language("swift")
         ,   "option.undefines"
         ,   "option.defines_if_ok"
         ,   "option.undefines_if_ok"
+        ,   "option.frameworkdirs"
         ,   "option.frameworks"
         ,   "platform.includedirs"
         ,   "platform.defines"
         ,   "platform.undefines"
+        ,   "platform.frameworkdirs"
         ,   "platform.frameworks"
         }
     ,   binary =
         {
             "config.linkdirs"
+        ,   "config.frameworkdirs"
         ,   "target.linkdirs"
         ,   "target.rpathdirs"
+        ,   "target.frameworkdirs"
         ,   "target.strip"
         ,   "target.symbols"
         ,   "option.strip"
         ,   "option.symbols"
         ,   "option.linkdirs"
         ,   "option.rpathdirs"
+        ,   "option.frameworkdirs"
         ,   "platform.linkdirs"
         ,   "platform.rpathdirs"
         ,   "config.links"
         ,   "config.frameworks"
         ,   "target.links"
         ,   "target.frameworks"
+        ,   "platform.frameworkdirs"
         ,   "option.links"
         ,   "option.frameworks"
         ,   "platform.links"
@@ -100,13 +108,17 @@ language("swift")
     ,   shared =
         {
             "config.linkdirs"
+        ,   "config.frameworkdirs"
         ,   "target.linkdirs"
+        ,   "target.frameworkdirs"
         ,   "target.strip"
         ,   "target.symbols"
         ,   "option.strip"
         ,   "option.symbols"
         ,   "option.linkdirs"
+        ,   "option.frameworkdirs"
         ,   "platform.linkdirs"
+        ,   "platform.frameworkdirs"
         ,   "config.links"
         ,   "config.frameworks"
         ,   "target.links"
@@ -137,6 +149,7 @@ language("swift")
                 , { nil, "linkdirs",   "kv", nil,          "The Link Search Directories"       }
                 , { nil, "includedirs","kv", nil,          "The Include Search Directories"    }
                 , { nil, "frameworks", "kv", nil,          "The Link Frameworks"               }
+                , { nil, "frameworkdirs", "kv", nil,          "The Include and Link Frameworks Search Directories" }
                 }
             } 
 

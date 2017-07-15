@@ -52,6 +52,7 @@ language("objc++")
         object =
         {
             "config.includedirs"
+        ,   "config.frameworkdirs"
         ,   "config.frameworks"
         ,   "target.symbols"
         ,   "target.warnings"
@@ -61,6 +62,7 @@ language("objc++")
         ,   "target.includedirs"
         ,   "target.defines"
         ,   "target.undefines"
+        ,   "target.frameworkdirs"
         ,   "target.frameworks"
         ,   "option.symbols"
         ,   "option.warnings"
@@ -72,10 +74,12 @@ language("objc++")
         ,   "option.undefines"
         ,   "option.defines_if_ok"
         ,   "option.undefines_if_ok"
+        ,   "option.frameworkdirs"
         ,   "option.frameworks"
         ,   "platform.includedirs"
         ,   "platform.defines"
         ,   "platform.undefines"
+        ,   "platform.frameworkdirs"
         ,   "platform.frameworks"
         }
     ,   binary =
@@ -92,17 +96,22 @@ language("objc++")
         ,   "platform.linkdirs"
         ,   "platform.rpathdirs"
         ,   "config.links"
+        ,   "config.frameworkdirs"
         ,   "config.frameworks"
         ,   "target.links"
+        ,   "target.frameworkdirs"
         ,   "target.frameworks"
         ,   "option.links"
+        ,   "option.frameworkdirs"
         ,   "option.frameworks"
         ,   "platform.links"
+        ,   "platform.frameworkdirs"
         ,   "platform.frameworks"
         }
     ,   shared =
         {
             "config.linkdirs"
+        ,   "config.frameworkdirs"
         ,   "target.linkdirs"
         ,   "target.strip"
         ,   "target.symbols"
@@ -113,10 +122,13 @@ language("objc++")
         ,   "config.links"
         ,   "config.frameworks"
         ,   "target.links"
+        ,   "target.frameworkdirs"
         ,   "target.frameworks"
         ,   "option.links"
+        ,   "option.frameworkdirs"
         ,   "option.frameworks"
         ,   "platform.links"
+        ,   "platform.frameworkdirs"
         ,   "platform.frameworks"
         }
     ,   static = 
@@ -154,6 +166,7 @@ language("objc++")
                 ,   {nil, "linkdirs",   "kv", nil,          "The Link Search Directories"           }
                 ,   {nil, "includedirs","kv", nil,          "The Include Search Directories"        }
                 ,   {nil, "frameworks", "kv", nil,          "The Link Frameworks"                   }
+                ,   {nil, "frameworkdirs", "kv", nil,          "The Include and Link Frameworks Search Directories" }
                 }
             }
 
