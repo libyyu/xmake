@@ -79,7 +79,7 @@ function _make_linkflags(targetinfo, vcxprojdir, vcxprojfile)
                             if not path.is_absolute(dir) then
                                 dir = path.relative(path.absolute(dir), vcxprojdir)
                             end
-                            dir = path.relative(path.join(dir, targetinfo.mode), vcxprojdir)                  
+                            dir = path.relative(dir, vcxprojdir)                  
                             return dir
                         end)
             table.insert(lib_paths,flag)
@@ -87,16 +87,26 @@ function _make_linkflags(targetinfo, vcxprojdir, vcxprojfile)
 
         -- replace -pdb:symbol.pdb or /pdb:symbol.pdb
         flag = flag:gsub("[%-|/]pdb:(.*)", function (dir)
-                        dir = dir:trim()
+                        --[[dir = dir:trim()
                         if not path.is_absolute(dir) then
                             dir = path.relative(path.absolute(dir), vcxprojdir)
                         end
-                        dir = path.relative(dir:gsub("(.*)\\"..arch.."\\(.*)", "%1\\" .. arch .. "\\" .. targetinfo.mode .. "\\%2"), vcxprojdir)
-                        return "/pdb:" .. dir
+                        dir = path.relative(dir:gsub("(.*)\\"..arch.."\\(.*)", "%1\\" .. arch .. "\\%2"), vcxprojdir)
+                        return "/pdb:" .. dir]]
+                        return ""
                     end)
 
         --remove -machine:x86 or -machine:x64
         flag = flag:gsub("[%-|/]machine:(.*)", function (dir)
+                        return ""
+                    end)
+        flag = flag:gsub("[%-|/]ENTRY:(.*)", function (dir)
+                        return ""
+                    end)
+        flag = flag:gsub("[%-|/]DYNAMICBASE:(.*)", function (dir)
+                        return ""
+                    end)
+        flag = flag:gsub("[%-|/]NXCOMPAT:(.*)", function (dir)
                         return ""
                     end)
 
@@ -209,6 +219,18 @@ function _make_tailer(vcxprojfile, vsinfo)
     vcxprojfile:leave("</Project>")
 end
 
+-- charset
+function _get_charset(targetinfo)
+    local charset = "MultiByte"
+    for _, v in ipairs( targetinfo.defines ) do
+        if v == "_UNICODE" or v == "UNICODE" then
+            charset = "Unicode"
+            break
+        end
+    end
+    return charset
+end
+
 -- make Configurations
 function _make_configurations(vcxprojfile, vsinfo, target, vcxprojdir)
 
@@ -267,7 +289,7 @@ function _make_configurations(vcxprojfile, vsinfo, target, vcxprojdir)
         vcxprojfile:enter("<PropertyGroup Condition=\"\'%$(Configuration)|%$(Platform)\'==\'%s|%s\'\" Label=\"Configuration\">", targetinfo.mode, targetinfo.arch)
             vcxprojfile:print("<ConfigurationType>%s</ConfigurationType>", assert(configuration_types[target.kind]))
             vcxprojfile:print("<PlatformToolset>v%s</PlatformToolset>", assert(toolset_versions["vs" .. vsinfo.vstudio_version]))
-            vcxprojfile:print("<CharacterSet>MultiByte</CharacterSet>")
+            vcxprojfile:print("<CharacterSet>%s</CharacterSet>", _get_charset(targetinfo))
         vcxprojfile:leave("</PropertyGroup>")
     end
 
@@ -294,7 +316,7 @@ function _make_configurations(vcxprojfile, vsinfo, target, vcxprojdir)
             --local relative_path = path.relative(path.absolute(config.get("buildir")), vcxprojdir)
             --local relative_path = path.relative(path.absolute("$(plat)"), vcxprojdir) 
             local relative_path = path.relative(targetinfo.targetdir, vcxprojdir)
-            vcxprojfile:print("<OutDir>%s\\%$(Configuration)\\</OutDir>", relative_path)--, ifelse(targetinfo.arch == "Win32", "x86", targetinfo.arch) )
+            vcxprojfile:print("<OutDir>%s\\</OutDir>", relative_path)--, ifelse(targetinfo.arch == "Win32", "x86", targetinfo.arch) )
             vcxprojfile:print("<IntDir>%$(Configuration)\\</IntDir>")
             if target.kind == "binary" or target.kind == "shared" then
                 for _, flag in ipairs(targetinfo.ldflags) do
@@ -328,6 +350,15 @@ function _make_source_options(vcxprojfile, targetinfo, condition)
         vcxprojfile:print("<Optimization%s>Full</Optimization>", condition) 
     else
         vcxprojfile:print("<Optimization%s>Disabled</Optimization>", condition) 
+    end
+
+    -- make FloatingPointModel
+    if flagstr:find("[%-|/]fp:fast") then
+        vcxprojfile:print("<FloatingPointModel%s>Fast</FloatingPointModel>", condition) 
+    elseif flagstr:find("[%-|/]fp:strict") then
+        vcxprojfile:print("<FloatingPointModel%s>Strict</FloatingPointModel>", condition) 
+    elseif flagstr:find("[%-|/]fp:precise") then
+        vcxprojfile:print("<FloatingPointModel%s>Precise</FloatingPointModel>", condition) 
     end
 
     -- make WarningLevel
@@ -422,7 +453,7 @@ function _make_source_options(vcxprojfile, targetinfo, condition)
     local predefinitions = {}
     local warningsdisables = {}
     local additional_flags = {}
-    local excludes = {"Os", "O0", "O1", "O2", "Ot", "Ox", "Od", "W0", "W1", "W2", "W3", "W4", "WX", "Wall", "Zi", "ZI", "Z7", "MT", "MTd", "MD", "MDd", "TP", "I", "D", "wd", "GF", "MP", "GM", "Gy", "Oy", "Gz", "Gr", "Gd", "Gv" }
+    local excludes = {"Os", "O0", "O1", "O2", "Ot", "Ox", "Od", "W0", "W1", "W2", "W3", "W4", "WX", "Wall", "Zi", "ZI", "Z7", "MT", "MTd", "MD", "MDd", "TP", "I", "D", "wd", "GF", "MP", "GM", "Gy", "Oy", "Gz", "Gr", "Gd", "Gv", "FD", "fp" }
     for _, flag in ipairs(flags) do
         local excluded = false
         local is_include_dir = false
@@ -481,6 +512,22 @@ function _make_source_options(vcxprojfile, targetinfo, condition)
     vcxprojfile:print("<AdditionalOptions%s>%s %%(AdditionalOptions)</AdditionalOptions>", condition, table.concat(additional_flags, " "):trim())
 end
 
+-- system
+function _get_system(targetinfo)
+    local sys = ifelse(targetinfo.targetkind == "binary", "Console", "")
+    for _, flag in ipairs(targetinfo.ldflags) do
+        if flag:find("[%-|/]SUBSYSTEM:\"(.*)\"") then
+            local subsystem = flag:gsub("[%-|/]SUBSYSTEM:\"(.*)\"", function(symbol)
+                symbol = symbol:trim()
+                return symbol
+            end)
+            sys = subsystem
+            break
+        end
+    end
+    return sys
+end
+
 -- make common item 
 function _make_common_item(vcxprojfile, vsinfo, targetinfo, vcxprojdir)
 
@@ -508,8 +555,14 @@ function _make_common_item(vcxprojfile, vsinfo, targetinfo, vcxprojdir)
             end
             vcxprojfile:print("<GenerateDebugInformation>%s</GenerateDebugInformation>", tostring(debug))
 
+            -- make *.pdb file path
+            local symbolfile = targetinfo.symbolfile
+            if symbolfile then
+               vcxprojfile:print("<ProgramDatabaseFile>%s</ProgramDatabaseFile>", path.relative(path.absolute(symbolfile),vcxprojdir))
+            end
+            
             -- make SubSystem
-            vcxprojfile:print("<SubSystem>%s</SubSystem>", ifelse(targetinfo.targetkind == "binary", "Console", ""))
+            vcxprojfile:print("<SubSystem>%s</SubSystem>", _get_system(targetinfo))
         
             -- make TargetMachine
             vcxprojfile:print("<TargetMachine>%s</TargetMachine>", ifelse(targetinfo.arch == "x64", "MachineX64", "MachineX86"))
@@ -527,7 +580,13 @@ function _make_common_item(vcxprojfile, vsinfo, targetinfo, vcxprojdir)
         _make_source_options(vcxprojfile, targetinfo)
 
         -- make ProgramDataBaseFileName (default: empty)
-        vcxprojfile:print("<ProgramDataBaseFileName></ProgramDataBaseFileName>") 
+        --vcxprojfile:print("<ProgramDataBaseFileName></ProgramDataBaseFileName>") 
+        -- make *.pdb file path
+        local symbolfile = targetinfo.symbolfile
+        if symbolfile then
+            vcxprojfile:print("<ProgramDatabaseFile>%s</ProgramDatabaseFile>", path.relative(path.absolute(symbolfile),vcxprojdir))
+        end
+
 
     vcxprojfile:leave("</ClCompile>")
 

@@ -76,8 +76,9 @@ function target:get(infoname)
 end
 
 function target:targetmode()
-    local targetmode = self:get("mode") or config.get("mode")
-    return targetmode
+	
+    -- get it
+    return self:get("mode") or config.get("mode")
 end
 
 -- get the target name

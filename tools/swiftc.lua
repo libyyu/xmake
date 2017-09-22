@@ -183,7 +183,7 @@ end
 function nf_framework(framework)
 
     -- make it
-    return "-framework" .. framework
+    return "-framework " .. framework
 end
 
 -- make the frameworkdir flag

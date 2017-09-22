@@ -44,9 +44,18 @@ function _make_targetinfo(mode, arch, target)
 
     -- save target kind
     targetinfo.targetkind = target:targetkind()
+	
+	-- save target file
+    targetinfo.targetfile = target:targetfile()
+	
+	-- save symbol file
+    targetinfo.symbolfile = target:symbolfile()
 
     -- save sourcebatches
     targetinfo.sourcebatches = target:sourcebatches()
+
+    -- defines
+    targetinfo.defines = target:get("defines")
 
     -- save compiler flags
     targetinfo.compflags = {}

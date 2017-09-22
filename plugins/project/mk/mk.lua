@@ -501,9 +501,35 @@ function _make_all(mkinfo)
         genallbashfile:print("fi")
         genallbashfile:print("")
     end
-    -- make .vcxproj
+
+    -- make all
+    local function _is_dep(ta, tb)
+        for _, targetinfo in ipairs( ta.info ) do
+            for _, v in pairs( targetinfo.deps ) do
+                if v == tb.name then
+                    return true
+                end
+            end
+        end
+        return false
+    end
+    local sorttargets = {}
     for _, target in pairs(mkinfo.targets) do
+        sorttargets[#sorttargets+1] = target
+    end    
+    table.sort(sorttargets, function(ta, tb)
+        if _is_dep(ta, tb) then
+            return false
+        elseif _is_dep(tb, ta) then
+            return true
+        else
+            return false
+        end
+    end)
+
+    for _, target in ipairs( sorttargets ) do
         if target.kind ~= "binary" then
+            print("gen target["..target.name.."].")
             local target_dir = path.join(mkinfo.outputdir, target.name)
 
             -- make application.mk
@@ -646,7 +672,6 @@ function make(outputdir)
 
             -- save targets
             for targetname, target in pairs(project.targets()) do
-
                 -- make target with the given mode and arch
                 targets[targetname] = targets[targetname] or {}
                 local _target = targets[targetname]

@@ -95,7 +95,7 @@ function sandbox_try.try(block)
     -- get catch and finally functions
     local funcs = block[2]
     if funcs and block[3] then
-        table.join2(funcs, block[2])
+        table.join2(funcs, block[3])
     end
 
     -- try to call it

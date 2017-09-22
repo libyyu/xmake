@@ -131,6 +131,14 @@ function main()
     ,   ["x86"]         = "i686-linux-android"
     }
 
+    -- check
+    if not config.get("sh") then
+        os.raise("can not found compiler for " .. arch)
+    end
+    if not config.get("ld") then
+        os.raise("can not found linker for " .. arch)
+    end
+
     -- init flags for rust
     _g.rcflags       = { "--target=" .. targets[arch] }
     _g["rc-shflags"] = { "-C linker=" .. config.get("sh"), "-C link-args=\"" .. (table.concat(_g.shflags, " "):gsub("%-march=.-%s", "")) .. "\"" }
