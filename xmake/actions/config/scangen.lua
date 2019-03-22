@@ -16,7 +16,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 -- 
--- Copyright (C) 2015 - 2018, TBOOX Open Source Group.
+-- Copyright (C) 2015 - 2019, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        scangen.lua
@@ -32,7 +32,7 @@ import("core.language.language")
 function main()
 
     -- trace
-    cprint("${yellow}xmake.lua not found, scanning files ..")
+    cprint("${color.warning}xmake.lua not found, scanning files ..")
 
     -- scan source files for the current directory
     local targetkinds = {}

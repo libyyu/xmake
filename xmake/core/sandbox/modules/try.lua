@@ -16,7 +16,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 -- 
--- Copyright (C) 2015 - 2018, TBOOX Open Source Group.
+-- Copyright (C) 2015 - 2019, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        try.lua
@@ -34,15 +34,20 @@ local sandbox_try = sandbox_try or {}
 -- traceback
 function sandbox_try._traceback(errors)
 
-    -- not verbose?
+    -- no diagnosis info?
     if not option.get("diagnosis") then
         if errors then
             -- remove the prefix info
             local _, pos = errors:find(":%d+: ")
             if pos then
-                return errors:sub(pos + 1)
+                errors = errors:sub(pos + 1)
             end
         end
+        return errors
+    end
+
+    -- traceback exists?
+    if errors and errors:find("stack traceback:", 1, true) then
         return errors
     end
 
@@ -96,22 +101,24 @@ function sandbox_try.try(block)
     local funcs = table.join(block[2] or {}, block[3] or {})
 
     -- try to call it
-    local ok, errors = xpcall(try, sandbox_try._traceback)
+    local ok, errors_or_r1, r2, r3, r4, r5, r6 = xpcall(try, sandbox_try._traceback)
     if not ok then
 
         -- run the catch function
         if funcs and funcs.catch then
-            funcs.catch(errors)
+            funcs.catch(errors_or_r1)
         end
     end
 
     -- run the finally function
     if funcs and funcs.finally then
-        funcs.finally(ok, errors)
+        funcs.finally(ok, errors_or_r1, r2, r3, r4, r5, r6)
     end
 
     -- ok?
-    return utils.ifelse(ok, errors, nil)
+    if ok then
+        return errors_or_r1, r2, r3, r4, r5, r6
+    end
 end
 
 -- return module

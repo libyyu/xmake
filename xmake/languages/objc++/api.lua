@@ -16,7 +16,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 -- 
--- Copyright (C) 2015 - 2018, TBOOX Open Source Group.
+-- Copyright (C) 2015 - 2019, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        api.lua
@@ -44,6 +44,7 @@ function apis()
     ,   "target.add_defines_h"
     ,   "target.add_undefines_h"
     ,   "target.add_frameworks"
+    ,   "target.add_rpathdirs"  -- @note do not translate path, it's usually an absolute path or contains $ORIGIN/@loader_path
         -- option.add_xxx
     ,   "option.add_cincludes"
     ,   "option.add_cxxincludes"
@@ -66,24 +67,25 @@ function apis()
     ,   "option.add_undefines_if_ok"
     ,   "option.add_undefines_h_if_ok"
     ,   "option.add_frameworks"
+    ,   "option.add_rpathdirs"
     }
     _g.pathes = 
     {
         -- target.set_xxx
-        "target.set_headerdir"
-    ,   "target.set_config_h" -- deprecated
+        "target.set_headerdir"      -- TODO deprecated
+    ,   "target.set_config_h"       -- TODO deprecated
     ,   "target.set_config_header"
     ,   "target.set_pcheader"
     ,   "target.set_pcxxheader"
         -- target.add_xxx
-    ,   "target.add_headers"
+    ,   "target.add_headers"        -- TODO deprecated
+    ,   "target.add_headerdirs" 
+    ,   "target.add_headerfiles"
     ,   "target.add_linkdirs"
-    ,   "target.add_rpathdirs"
     ,   "target.add_includedirs"
     ,   "target.add_frameworkdirs"
         -- option.add_xxx
     ,   "option.add_linkdirs"
-    ,   "option.add_rpathdirs"
     ,   "option.add_includedirs"
     ,   "option.add_frameworkdirs"
     }

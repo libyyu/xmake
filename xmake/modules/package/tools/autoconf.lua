@@ -16,7 +16,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 -- 
--- Copyright (C) 2015 - 2018, TBOOX Open Source Group.
+-- Copyright (C) 2015 - 2019, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        autoconf.lua
@@ -28,7 +28,7 @@ function install(package, configs)
     -- generate configure file
     if not os.isfile("configure") then
         if os.isfile("autogen.sh") then
-            os.vrun("./autogen.sh")
+            os.vrunv("sh", {"./autogen.sh"})
         elseif os.isfile("configure.ac") then
             os.vrun("autoreconf --install --symlink")
         end
@@ -53,7 +53,7 @@ function install(package, configs)
     -- inherit flags from configs
     local flags_prev = {}
     for _, name in ipairs({"cflags", "cxxflags", "ldflags"}) do
-        local flags = package:config(name) or configs[name]
+        local flags = package:config(name) or (configs and configs[name] or nil)
         if flags then
             flags_prev[name] = os.getenv(name:upper())
             os.addenv(name:upper(), flags)

@@ -16,7 +16,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 -- 
--- Copyright (C) 2015 - 2018, TBOOX Open Source Group.
+-- Copyright (C) 2015 - 2019, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        has_flags.lua
@@ -115,6 +115,7 @@ end
 function _ignore_flags(flags)
     local results = {}
     for _, flag in ipairs(flags) do
+        flag = flag:lower()
         if not flag:find("[%-/]def:.+%.def") and not flag:find("[%-/]export:") then
             table.insert(results, flag)
         end

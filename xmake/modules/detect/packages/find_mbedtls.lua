@@ -16,14 +16,14 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 -- 
--- Copyright (C) 2015 - 2018, TBOOX Open Source Group.
+-- Copyright (C) 2015 - 2019, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        find_mbedtls.lua
 --
 
 -- imports
-import("lib.detect.pkg_config")
+import("package.manager.find_package")
 
 -- find mbedtls 
 --
@@ -32,9 +32,6 @@ import("lib.detect.pkg_config")
 -- @return      see the return value of find_package()
 --
 function main(opt)
-
-    -- find package from the current host platform
-    if opt.plat == os.host() and opt.arch == os.arch() then
-        return pkg_config.find("mbedtls", {links = {"mbedtls", "mbedcrypto", "mbedx509"}})
-    end
+    opt.links = {"mbedtls", "mbedcrypto", "mbedx509"}  
+    return opt.find_package("mbedtls", opt)
 end

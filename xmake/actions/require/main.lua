@@ -16,7 +16,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 -- 
--- Copyright (C) 2015 - 2018, TBOOX Open Source Group.
+-- Copyright (C) 2015 - 2019, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        main.lua
@@ -38,7 +38,7 @@ import("unlink")
 
 --
 -- the default repositories:
---     xmake-repo https://github.com/tboox/xmake-repo.git
+--     xmake-repo https://github.com/xmake-io/xmake-repo.git
 --
 -- add other repositories:
 --     xmake repo --add other-repo https://github.com/other/other-repo.git

@@ -16,7 +16,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 -- 
--- Copyright (C) 2015 - 2018, TBOOX Open Source Group.
+-- Copyright (C) 2015 - 2019, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        xmake.lua
@@ -45,19 +45,15 @@ task("global")
                 -- options
             ,   options = 
                 {
-                    {'c', "clean",      "k", nil,         "Clean the cached configure and configure all again."     }
+                    {'c', "clean",      "k", nil,       "Clean the cached configure and configure all again."     }
+                ,   {nil, "menu",       "k", nil,       "Configure with a menu-driven user interface."            }
 
-                ,   {}
-
-                ,   {nil, "make",       "kv", "auto",   "Set the make path."                                        }
-                ,   {nil, "ccache",     "kv", "auto",   "Enable or disable the c/c++ compiler cache." 
-                                                    ,   "    --ccache=[y|n]"                                        }
-
-                ,   {}
-                ,   {nil, "debugger",   "kv", "auto",   "The Debugger"                                              }
-                ,   {}
+                ,   {category = "."}
+                ,   {nil, "theme",      "kv", "default","The theme name."                                         }
+                ,   {nil, "debugger",   "kv", "auto",   "The Debugger Program Path."                              }
 
                     -- show platform menu options
+                ,   {category = "Platform Configuration"}
                 ,   function () 
 
                         -- import platform menu

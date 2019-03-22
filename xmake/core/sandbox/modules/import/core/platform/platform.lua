@@ -16,7 +16,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 -- 
--- Copyright (C) 2015 - 2018, TBOOX Open Source Group.
+-- Copyright (C) 2015 - 2019, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        platform.lua
@@ -39,15 +39,14 @@ function sandbox_core_platform.load(plat)
     end
 end
 
+-- get the platform os
+function sandbox_core_platform.os()
+    return assert(platform.os())
+end
+
 -- get the all platforms
 function sandbox_core_platform.plats()
-
-    -- get it 
-    local plats = platform.plats()
-    assert(plats)
-
-    -- ok
-    return plats
+    return assert(platform.plats())
 end
 
 -- get the all architectures for the given platform

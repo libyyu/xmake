@@ -24,8 +24,7 @@
 
 -- imports
 import("core.base.option")
-import("core.project.config")
-import("core.project.project")
+import("core.base.global")
 import("core.ui.log")
 import("core.ui.rect")
 import("core.ui.view")
@@ -52,7 +51,7 @@ function app:init()
     self:insert(self:mconfdialog())
 
     -- load configs
-    self:load(not option.get("clean"))
+    self:load()
 end
 
 -- get menu config dialog
@@ -76,8 +75,7 @@ end
 function app:_filter_option(name)
     local options = 
     {
-        target      = true
-    ,   file        = true
+        file        = true
     ,   root        = true
     ,   yes         = true
     ,   quiet       = true
@@ -86,13 +84,12 @@ function app:_filter_option(name)
     ,   verbose     = true
     ,   backtrace   = true
     ,   diagnosis   = true
-    ,   require     = true
     ,   version     = true
     ,   help        = true
     ,   clean       = true
     ,   menu        = true
     }
-    return not options[name] and not project.option(name)
+    return not options[name] 
 end
 
 -- get or make menu by category
@@ -152,7 +149,7 @@ function app:_make_configs_by_category(root, options_by_category, cache, get_opt
             -- load value
             local value = nil
             if cache then
-                value = config.get(info.name)
+                value = global.get(info.name)
                 if value ~= nil and info.kind == "choice" and info.values then
                     for idx, val in ipairs(info.values) do
                         if value == val then
@@ -193,17 +190,17 @@ function app:_make_configs_by_category(root, options_by_category, cache, get_opt
     return configs
 end
 
--- get basic configs 
-function app:_basic_configs(cache)
+-- get global configs 
+function app:_global_configs(cache)
     
     -- get configs from the cache first 
-    local configs = self._BASIC_CONFIGS
+    local configs = self._GLOBAL_CONFIGS
     if configs then
         return configs
     end
 
     -- get config menu
-    local menu = option.taskmenu("config")
+    local menu = option.taskmenu("global")
 
     -- merge options by category
     local category = "."
@@ -220,7 +217,7 @@ function app:_basic_configs(cache)
     end
 
     -- make configs by category
-    self._BASIC_CONFIGS = self:_make_configs_by_category("Basic Configuration", options_by_category, cache, function (opt) 
+    self._GLOBAL_CONFIGS = self:_make_configs_by_category("Global Configuration", options_by_category, cache, function (opt) 
 
         -- get default
         local default = opt[4]
@@ -262,62 +259,7 @@ function app:_basic_configs(cache)
         -- make option info
         return {name = opt[2] or opt[1], kind = kind, default = default, values = values, description = description}
     end)
-    return self._BASIC_CONFIGS
-end
-
--- get project configs 
-function app:_project_configs(cache)
- 
-    -- get configs from the cache first 
-    local configs = self._PROJECT_CONFIGS
-    if configs then
-        return configs
-    end
-
-    -- merge options by category
-    local options = project.options()
-    local options_by_category = {}
-    for _, opt in pairs(options) do
-        if opt:get("showmenu") then
-            local category = "."
-            if opt:get("category") then category = table.unwrap(opt:get("category")) end
-            options_by_category[category] = options_by_category[category] or {}
-            table.insert(options_by_category[category], opt)
-        end
-    end
-
-    -- make configs by category
-    self._PROJECT_CONFIGS = self:_make_configs_by_category("Project Configuration", options_by_category, cache, function (opt) 
-
-        -- the default value
-        local default = "auto"
-        if opt:get("default") ~= nil then
-            default = opt:get("default")
-        end
-
-        -- get kind
-        local kind = (type(default) == "string") and "string" or "boolean"
-
-        -- get description
-        local description = opt:get("description")
-
-        -- get source info
-        local sourceinfo = (opt:get("__sourceinfo_description") or {})[type(description) == "table" and description[1] or description]
-
-        -- choice option? 
-        local values = opt:get("values")
-        if values then
-            kind = "choice"
-            for idx, value in ipairs(values) do
-                if default == value then
-                    default = idx 
-                    break
-                end
-            end
-        end
-        return {name = opt:name(), kind = kind, default = default, values = values, description = description, sourceinfo = sourceinfo}
-    end)
-    return self._PROJECT_CONFIGS
+    return self._GLOBAL_CONFIGS
 end
 
 -- save the given configs
@@ -335,33 +277,30 @@ function app:_save_configs(configs)
 end
 
 -- load configs from options
-function app:load(cache)
+function app:load()
 
-    -- load config from cache
-    if cache then
-        cache = config.load(option.get("target") or "all")
+    -- clean the global configuration
+    if option.get("clean") then
+        global.clear()
     end
 
     -- clear configs first
-    self._BASIC_CONFIGS = nil
-    self._PROJECT_CONFIGS = nil
+    self._GLOBAL_CONFIGS = nil
 
     -- load configs
     local configs = {}
-    table.insert(configs, menuconf.menu {description = "Basic Configuration", configs = self:_basic_configs(cache)})
-    table.insert(configs, menuconf.menu {description = "Project Configuration", configs = self:_project_configs(cache)})
+    table.insert(configs, menuconf.menu {description = "Global Configuration", configs = self:_global_configs(cache)})
     self:mconfdialog():load(configs)
 
     -- the previous config is only for loading menuconf, so clear config now
-    if cache then
-        config.clear()
+    if option.get("clean") then
+        global.clear()
     end
 end
 
 -- save configs to options
 function app:save()
-    self:_save_configs(self:_basic_configs())    
-    self:_save_configs(self:_project_configs())    
+    self:_save_configs(self:_global_configs())    
 end
 
 -- main entry

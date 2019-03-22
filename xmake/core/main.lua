@@ -16,7 +16,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 -- 
--- Copyright (C) 2015 - 2018, TBOOX Open Source Group.
+-- Copyright (C) 2015 - 2019, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        main.lua
@@ -31,11 +31,13 @@ local log           = require("base/log")
 local path          = require("base/path")
 local utils         = require("base/utils")
 local option        = require("base/option")
+local global        = require("base/global")
 local profiler      = require("base/profiler")
 local deprecated    = require("base/deprecated")
 local privilege     = require("base/privilege")
 local task          = require("base/task")
 local colors        = require("base/colors")
+local theme         = require("theme/theme")
 local project       = require("project/project")
 local history       = require("project/history")
 
@@ -46,7 +48,7 @@ local menu =
     title = "${bright}xmake v" .. xmake._VERSION .. ", A cross-platform build utility based on Lua${clear}"
 
     -- copyright
-,   copyright = "Copyright (C) 2015-2018 Ruki Wang, ${underline}tboox.org${clear}, ${underline}xmake.io${clear}\nCopyright (C) 2005-2015 Mike Pall, ${underline}luajit.org${clear}"
+,   copyright = "Copyright (C) 2015-2019 Ruki Wang, ${underline}tboox.org${clear}, ${underline}xmake.io${clear}\nCopyright (C) 2005-2015 Mike Pall, ${underline}luajit.org${clear}"
 
     -- the tasks: xmake [task]
 ,   function () 
@@ -170,8 +172,8 @@ force to build in current directory via run `xmake -P .`]], os.projectdir())
     end
 end
 
--- the main function
-function main.done()
+-- the main entry function
+function main.entry()
 
     -- init 
     main._init()
@@ -206,6 +208,21 @@ Or you can add `--root` option or XMAKE_ROOT=y to allow run as root temporarily.
     if option.get("profile") then
         profiler:start()
     end
+
+    -- load global configuration
+    ok, errors = global.load()
+    if not ok then
+        utils.error(errors)
+        return -1
+    end
+
+    -- load theme
+    local theme_inst, errors = theme.load(global.get("theme") or "default")
+    if not theme_inst then
+        utils.error(errors)
+        return -1
+    end
+    colors.theme_set(theme_inst)
 
     -- show help?
     if main._show_help() then

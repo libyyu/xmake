@@ -16,7 +16,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 -- 
--- Copyright (C) 2015 - 2018, TBOOX Open Source Group.
+-- Copyright (C) 2015 - 2019, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        rule.lua
@@ -109,8 +109,14 @@ function rule._load(filepath)
     local interp = rule._interpreter()
     assert(interp) 
 
+    -- load script
+    local ok, errors = interp:load(filepath)
+    if not ok then
+        return nil, errors
+    end
+
     -- load rules
-    local results, errors = interp:load(filepath, "rule", true, true)
+    local results, errors = interp:make("rule", true, true)
     if not results then
         return nil, errors
     end
@@ -194,22 +200,15 @@ end
 
 -- new a rule instance
 function rule.new(name, info)
-
-    -- init a rule instance
     local instance = table.inherit(rule)
-    assert(instance)
-
-    -- save name and info
     instance._NAME = name
     instance._INFO = info
-
-    -- ok?
     return instance
 end
 
 -- get the rule info
 function rule:get(name)
-    return self._INFO[name]
+    return self._INFO:get(name)
 end
 
 -- get the rule name

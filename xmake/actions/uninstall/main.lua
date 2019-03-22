@@ -16,7 +16,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 -- 
--- Copyright (C) 2015 - 2018, TBOOX Open Source Group.
+-- Copyright (C) 2015 - 2019, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        main.lua
@@ -30,26 +30,6 @@ import("core.base.privilege")
 import("privilege.sudo")
 import("uninstall")
 
--- get install directory
-function _installdir()
-
-    -- the install directory
-    --
-    -- DESTDIR: be compatible with https://www.gnu.org/prep/standards/html_node/DESTDIR.html
-    --
-    local installdir = option.get("installdir") or os.getenv("INSTALLDIR") or os.getenv("DESTDIR") or platform.get("installdir")
-    assert(installdir, "unknown install directory!")
-
-    -- append prefix
-    local prefix = option.get("prefix") or os.getenv("PREFIX")
-    if prefix then
-        installdir = path.join(installdir, prefix)
-    end
-
-    -- ok
-    return installdir
-end
-
 -- main
 function main()
 
@@ -59,19 +39,13 @@ function main()
     -- config it first
     task.run("config", {target = targetname, require = "n"})
 
-    -- get install directory
-    local installdir = _installdir()
-
-    -- trace
-    print("uninstalling from %s ...", installdir)
-
     -- attempt to uninstall directly
     try
     {
         function ()
 
             -- uninstall target
-            uninstall(targetname, installdir)
+            uninstall(targetname)
 
             -- trace
             cprint("${bright}uninstall ok!${clear}${ok_hand}")
@@ -89,7 +63,7 @@ function main()
                         function ()
 
                             -- uninstall target
-                            uninstall(targetname, installdir)
+                            uninstall(targetname)
 
                             -- trace
                             cprint("${bright}uninstall ok!${clear}${ok_hand}")
@@ -107,7 +81,7 @@ function main()
                 end
 
                 -- show tips
-                cprint("${bright red}error: ${default red}failed to uninstall, may permission denied!")
+                cprint("${bright color.error}error: ${clear}failed to uninstall, may permission denied!")
 
                 -- continue to uninstall with administrator permission?
                 if sudo.has() then
@@ -117,7 +91,7 @@ function main()
                     if confirm == nil then
 
                         -- show tips
-                        cprint("${bright yellow}note: ${default yellow}try continue to uninstall with administrator permission again?")
+                        cprint("${bright color.warning}note: ${clear}try continue to uninstall with administrator permission again?")
                         cprint("please input: y (y/n)")
 
                         -- get answer
@@ -132,7 +106,7 @@ function main()
                     if confirm then
 
                         -- uninstall target with administrator permission
-                        sudo.runl(path.join(os.scriptdir(), "uninstall_admin.lua"), {targetname or "__all", installdir})
+                        sudo.runl(path.join(os.scriptdir(), "uninstall_admin.lua"), {targetname or "__all", option.get("installdir"), option.get("prefix")})
 
                         -- trace
                         cprint("${bright}uninstall ok!${clear}${ok_hand}")

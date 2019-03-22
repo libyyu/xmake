@@ -16,7 +16,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 -- 
--- Copyright (C) 2015 - 2018, TBOOX Open Source Group.
+-- Copyright (C) 2015 - 2019, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        main.lua
@@ -152,10 +152,42 @@ end
 
 -- run the all dependent targets
 function _run_deps(target)
-
-    -- run target deps
     for _, dep in ipairs(target:orderdeps()) do
         _run(dep)
+    end
+end
+
+-- check targets
+function _check_targets(targetname)
+
+    -- get targets
+    local targets = {}
+    if targetname and not targetname:startswith("__") then
+        table.insert(targets, project.target(targetname))
+    else
+        -- install default or all targets
+        for _, target in pairs(project.targets()) do
+            local default = target:get("default")
+            if (default == nil or default == true or option.get("all")) and target:targetkind() == "binary" then
+                table.insert(targets, target)
+            end
+        end
+    end
+
+    -- filter and check targets with builtin-run script
+    local targetnames = {}
+    for _, target in ipairs(targets) do
+        if not target:isphony() and target:get("enabled") ~= false and not target:script("run") then
+            local targetfile = target:targetfile()
+            if targetfile and not os.isfile(targetfile) then
+                table.insert(targetnames, target:name())
+            end
+        end
+    end
+
+    -- there are targets that have not yet been built?
+    if #targetnames > 0 then
+        raise("please run `$xmake [target]` to build the following targets first:\n  -> " .. table.concat(targetnames, '\n  -> '))
     end
 end
 
@@ -165,8 +197,11 @@ function main()
     -- get the target name
     local targetname = option.get("target")
 
-    -- build it first
-    task.run("build", {target = targetname, all = option.get("all")})
+    -- config it first
+    task.run("config", {target = targetname, require = "n"})
+
+    -- check targets first
+    _check_targets(targetname)
 
     -- enter project directory
     local oldir = os.cd(project.directory())
@@ -182,7 +217,7 @@ function main()
         -- run default or all binary targets
         for _, target in pairs(project.targets()) do
             local default = target:get("default")
-            if (default == nil or default == true or option.get("all")) and target:get("kind") == "binary" then
+            if (default == nil or default == true or option.get("all")) and target:targetkind() == "binary" then
                 _run_deps(target)
                 _run(target)
             end

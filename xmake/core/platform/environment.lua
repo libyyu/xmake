@@ -16,7 +16,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 -- 
--- Copyright (C) 2015 - 2018, TBOOX Open Source Group.
+-- Copyright (C) 2015 - 2019, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        environment.lua
@@ -26,12 +26,12 @@
 local environment = environment or {}
 
 -- load modules
-local os        = require("base/os")
-local global    = require("base/global")
-local platform  = require("platform/platform")
-local sandbox   = require("sandbox/sandbox")
-local package   = require("package/package")
-local import    = require("sandbox/modules/import")
+local os            = require("base/os")
+local global        = require("base/global")
+local platform_core = require("platform/platform")
+local sandbox       = require("sandbox/sandbox")
+local package       = require("package/package")
+local import        = require("sandbox/modules/import")
 
 -- enter the toolchains environment
 function environment._enter_toolchains()
@@ -40,15 +40,15 @@ function environment._enter_toolchains()
     environment._PATH = os.getenv("PATH")
 
     -- add global search binary pathes
-    local globaldir = package.prefixdir(true, false, os.host(), os.arch())
-    for _, dir in ipairs(table.wrap(package.getenv(true, false, os.host(), os.arch(), "PATH"))) do
+    local globaldir = package.prefixdir(true, "release", os.host(), os.arch())
+    for _, dir in ipairs(table.wrap(package.getenv(true, "release", os.host(), os.arch(), "PATH"))) do
         os.addenv("PATH", path.join(globaldir, dir))
     end
     os.addenv("PATH", path.join(globaldir, "bin"))
 
     -- add local search binary pathes
-    local localdir = package.prefixdir(false, false, os.host(), os.arch())
-    for _, dir in ipairs(table.wrap(package.getenv(false, false, os.host(), os.arch(), "PATH"))) do
+    local localdir = package.prefixdir(false, "release", os.host(), os.arch())
+    for _, dir in ipairs(table.wrap(package.getenv(false, "release", os.host(), os.arch(), "PATH"))) do
         os.addenv("PATH", path.join(localdir, dir))
     end
     os.addenv("PATH", path.join(localdir, "bin"))
@@ -56,12 +56,6 @@ function environment._enter_toolchains()
     -- add $programdir/winenv/bin to $path
     if os.host() == "windows" then
         os.addenv("PATH", path.join(os.programdir(), "winenv", "bin"))
-
-        -- attempt to load winenv 
-        local winenv_dir = path.join(global.directory(), "winenv")
-        if os.isdir(winenv_dir) then
-            import("winenv", {rootdir = winenv_dir, try = true, anonymous = true})(winenv_dir)
-        end
     end
 end
 
@@ -80,7 +74,7 @@ function environment._enter_run()
     environment._LD_LIBRARY_PATH = os.getenv("LD_LIBRARY_PATH")
 
     -- add global search library pathes of pathes
-    local globaldir = package.prefixdir(true, false, os.host(), os.arch())
+    local globaldir = package.prefixdir(true, "release", os.host(), os.arch())
     if os.host() == "windows" then
         os.addenv("PATH", path.join(globaldir, "lib"))
     else
@@ -88,7 +82,7 @@ function environment._enter_run()
     end
 
     -- add local search library pathes of pathes
-    local localdir = package.prefixdir(false, false, os.host(), os.arch())
+    local localdir = package.prefixdir(false, "release", os.host(), os.arch())
     if os.host() == "windows" then
         os.addenv("PATH", path.join(localdir, "lib"))
     else
@@ -107,6 +101,12 @@ end
 -- enter the environment for the current platform
 function environment.enter(name)
 
+    -- get the current platform 
+    local platform, errors = platform_core.load()
+    if not platform then
+        return false, errors
+    end
+
     -- the maps
     local maps = {toolchains = environment._enter_toolchains, run = environment._enter_run}
     
@@ -117,9 +117,9 @@ function environment.enter(name)
     end
 
     -- enter the environment of the given platform
-    local module = platform.get("environment")
-    if module then
-        local ok, errors = sandbox.load(module.enter, name)
+    local on_enter = platform:script("environment_enter")
+    if on_enter then
+        local ok, errors = sandbox.load(on_enter, platform, name)
         if not ok then
             return false, errors
         end
@@ -132,10 +132,16 @@ end
 -- leave the environment for the current platform
 function environment.leave(name)
 
+    -- get the current platform 
+    local platform, errors = platform_core.load()
+    if not platform then
+        return false, errors
+    end
+
     -- leave the environment of the given platform
-    local module = platform.get("environment")
-    if module then
-        local ok, errors = sandbox.load(module.leave, name)
+    local on_leave = platform:script("environment_leave")
+    if on_leave then
+        local ok, errors = sandbox.load(on_leave, platform, name)
         if not ok then
             return false, errors
         end

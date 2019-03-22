@@ -16,7 +16,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 -- 
--- Copyright (C) 2015 - 2018, TBOOX Open Source Group.
+-- Copyright (C) 2015 - 2019, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        find_wdk.lua
@@ -171,7 +171,7 @@ function main(sdkdir, opt)
     end
        
     -- find wdk
-    local wdk = _find_wdk(sdkdir or config.get("wdk") or global.get("wdk"), opt.version or config.get("wdk_sdkver"))
+    local wdk = _find_wdk(sdkdir or config.get("wdk") or global.get("wdk") or config.get("sdk"), opt.version or config.get("wdk_sdkver"))
     if wdk then
 
         -- save to config
@@ -180,14 +180,14 @@ function main(sdkdir, opt)
 
         -- trace
         if opt.verbose or option.get("verbose") then
-            cprint("checking for the WDK directory ... ${green}%s", wdk.sdkdir)
-            cprint("checking for the WDK version ... ${green}%s", wdk.sdkver)
+            cprint("checking for the WDK directory ... ${color.success}%s", wdk.sdkdir)
+            cprint("checking for the WDK version ... ${color.success}%s", wdk.sdkver)
         end
     else
 
         -- trace
         if opt.verbose or option.get("verbose") then
-            cprint("checking for the WDK directory ... ${red}no")
+            cprint("checking for the WDK directory ... ${color.nothing}${text.nothing}")
         end
     end
 

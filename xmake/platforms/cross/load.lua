@@ -16,7 +16,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 -- 
--- Copyright (C) 2015 - 2018, TBOOX Open Source Group.
+-- Copyright (C) 2015 - 2019, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        load.lua
@@ -31,8 +31,14 @@ function main(platform)
     -- init linkdirs and includedirs
     local sdkdir = config.get("sdk") 
     if sdkdir then
-        platform:add("includedirs", path.join(sdkdir, "include"))
-        platform:add("linkdirs", path.join(sdkdir, "lib"))
+        local includedir = path.join(sdkdir, "include")
+        if os.isdir(includedir) then
+            platform:add("includedirs", includedir)
+        end
+        local linkdir = path.join(sdkdir, "lib")
+        if os.isdir(linkdir) then
+            platform:add("linkdirs", linkdir)
+        end
     end
 
     -- add bin search library for loading some dependent .dll files windows 

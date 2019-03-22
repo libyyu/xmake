@@ -16,7 +16,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 -- 
--- Copyright (C) 2015 - 2018, TBOOX Open Source Group.
+-- Copyright (C) 2015 - 2019, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        table.lua
@@ -190,84 +190,12 @@ function table.is_dictionary(dict)
     return type(dict) == "table" and dict[1] == nil
 end
 
--- dump it with the level
-function table._dump(self, exclude, level)
- 
-    -- dump basic type
-    if type(self) == "string" or type(self) == "boolean" or type(self) == "number" then  
-        io.write(tostring(self))  
-    elseif type(self) == "table" and (getmetatable(self) or {}).__tostring then
-        io.write(tostring(self))  
-    -- dump table
-    elseif type(self) == "table" then  
-
-        -- dump head
-        io.write("\n")  
-        for l = 1, level do
-            io.write("    ")
-        end
-        io.write("{\n")
-
-        -- dump body
-        local i = 0
-        for k, v in pairs(self) do  
-
-            -- exclude some keys
-            if not exclude or type(k) ~= "string" or not k:find(exclude) then
-
-                -- dump spaces and separator
-                for l = 1, level do
-                    io.write("    ")
-                end
-
-                if i == 0 then
-                    io.write("    ")
-                else
-                    io.write(",   ")
-                end
-                
-                -- dump key
-                if type(k) == "string" then
-                    io.write(k, " = ")  
-                end
-
-                -- dump value
-                table._dump(v, exclude, level + 1)  
-
-                -- dump newline
-                io.write("\n")
-                i = i + 1
-            end
-        end  
-
-        -- dump tail
-        for l = 1, level do
-            io.write("    ")
-        end
-        io.write("}\n")  
-    elseif self ~= nil then
-        io.write("<" .. tostring(self) .. ">")
-    else
-        io.write("nil")
+-- dump table
+function table.dump(self, deflate)
+    local str = string.dump(self, deflate)
+    if str then
+        io.write(str)
     end
-end
-
--- dump it
-function table.dump(self, exclude, prefix)
-
-    -- dump prefix
-    if prefix then
-        io.write(prefix)
-    end
-  
-    -- dump it
-    table._dump(self, exclude, 0)
-
-    -- end
-    print("")
-
-    -- return it
-    return self
 end
 
 -- unwrap object if be only one
@@ -300,8 +228,8 @@ end
 -- remove repeat from the given array
 function table.unique(array, barrier)
 
-    -- remove repeat
-    if type(array) == "table" then
+    -- remove repeat for array
+    if table.is_array(array) then
 
         -- not only one?
         if table.getn(array) ~= 1 then

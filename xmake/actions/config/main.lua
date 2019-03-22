@@ -16,7 +16,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 -- 
--- Copyright (C) 2015 - 2018, TBOOX Open Source Group.
+-- Copyright (C) 2015 - 2019, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        main.lua
@@ -28,10 +28,11 @@ import("core.project.config")
 import("core.base.global")
 import("core.project.project")
 import("core.platform.platform")
-import("core.project.cache", {nocache = true})
+import("core.project.cache")
 import("lib.detect.cache", {alias = "detectcache"})
 import("scangen")
 import("menuconf", {alias = "menuconf_show"})
+import("configfiles", {alias = "generate_configfiles"})
 import("configheader", {alias = "generate_configheader"})
 import("actions.require.install", {alias = "install_requires", rootdir = os.programdir()})
 
@@ -70,8 +71,9 @@ function _need_check(changed)
     local mtimes = project.mtimes()
 
     -- get the previous mtimes 
+    local configcache = cache("local.config")
     if not changed then
-        local mtimes_prev = cache.get("mtimes")
+        local mtimes_prev = configcache:get("mtimes")
         if mtimes_prev then 
 
             -- check for all project files
@@ -88,7 +90,7 @@ function _need_check(changed)
     end
 
     -- update mtimes
-    cache.set("mtimes", mtimes)
+    configcache:set("mtimes", mtimes)
 
     -- changed?
     return changed
@@ -147,11 +149,6 @@ function main()
     if _g.configured then return end
     _g.configured = true
 
-    -- enter menu config
-    if option.get("menu") then
-        menuconf_show()
-    end
-
     -- scan project and generate it if xmake.lua not exists
     if not os.isfile(project.file()) then
 
@@ -160,7 +157,7 @@ function main()
         if not option.get("quiet") and not option.get("yes") then
 
             -- show tips
-            cprint("${bright yellow}note: ${default yellow}xmake.lua not found, try generating it (pass -y to skip confirm)?")
+            cprint("${bright color.warning}note: ${clear}xmake.lua not found, try generating it (pass -y to skip confirm)?")
             cprint("please input: n (y/n)")
 
             -- get answer
@@ -179,14 +176,16 @@ function main()
         scangen()
     end
 
+    -- enter menu config
+    if option.get("menu") then
+        menuconf_show()
+    end
+
     -- the target name
     local targetname = option.get("target") or "all"
 
-    -- enter cache scope
-    cache.enter("local.config")
-
-    -- load global configure
-    global.load()
+    -- get config cache
+    local configcache = cache("local.config")
 
     -- load the project configure
     --
@@ -206,7 +205,7 @@ function main()
     local options_changed = false
     local options_history = {}
     if not option.get("clean") then
-        options_history = cache.get("options_" .. targetname) or {}
+        options_history = configcache:get("options_" .. targetname) or {}
         options = options or options_history
     end
     for name, value in pairs(options) do
@@ -223,9 +222,9 @@ function main()
     -- @note we cannot load cache config when switching platform, arch .. 
     -- so we need known whether options have been changed
     --
-    local configcache = false
+    local configcache_loaded = false
     if not options_changed and not option.get("clean") and not _host_changed(targetname) then
-        configcache = config.load(targetname) 
+        configcache_loaded = config.load(targetname) 
     end
 
     -- merge the global configure 
@@ -242,8 +241,17 @@ function main()
         end
     end
 
+    -- merge the project options after default options
+    for name, value in pairs(project.get("config")) do
+        value = table.unwrap(value)
+        assert(type(value) == "string", "set_config(%s): too much values", name)
+        if not config.readonly(name) then
+            config.set(name, value)
+        end
+    end
+
     -- merge the checked configure 
-    local recheck = _need_check(options_changed or not configcache)
+    local recheck = _need_check(options_changed or not configcache_loaded)
     if recheck then
 
         -- clear detect cache
@@ -271,12 +279,13 @@ function main()
         install_requires()
     end
 
-    -- check target, @note we must load targets after installing required packages, 
+    -- check target and ensure to load all targets, @note we must load targets after installing required packages, 
     -- otherwise has_package() will be invalid.
     _check_target(targetname)
 
     -- update the config header
     if recheck then
+        generate_configfiles()
         generate_configheader()
     end
 
@@ -287,16 +296,16 @@ function main()
 
     -- save options and configure for the given target
     config.save(targetname)
-    cache.set("options_" .. targetname, options)
+    configcache:set("options_" .. targetname, options)
 
     -- save options and configure for each targets if be all
     if targetname == "all" then
         for _, target in pairs(project.targets()) do
             config.save(target:name())
-            cache.set("options_" .. target:name(), options)
+            configcache:set("options_" .. target:name(), options)
         end
     end
 
-    -- flush cache
-    cache.flush()
+    -- flush config cache
+    configcache:flush()
 end

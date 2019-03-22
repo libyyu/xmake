@@ -16,7 +16,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 -- 
--- Copyright (C) 2015 - 2018, TBOOX Open Source Group.
+-- Copyright (C) 2015 - 2019, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        project.lua
@@ -123,13 +123,6 @@ function project._api_has_package(interp, ...)
     end
 end
 
--- set config from the given name
-function project._api_set_config(interp, name, value)
-    if not config.readonly(name) then
-        config.set(name, value)
-    end
-end
-
 -- get config from the given name
 function project._api_get_config(interp, name)
     return config.get(name)
@@ -154,18 +147,9 @@ function project._api_add_plugindirs(interp, ...)
     interp:api_builtin_includes(plugindirs)
 end
 
--- add package directories and load all packages from the given directories
-function project._api_add_packagedirs(interp, ...)
-
-    -- get all directories
-    local pkgdirs = {}
-    local dirs = table.join(...)
-    for _, dir in ipairs(dirs) do
-        table.insert(pkgdirs, dir .. "/*.pkg")
-    end
-
-    -- add all packages
-    interp:api_builtin_includes(pkgdirs)
+-- add platform directories
+function project._api_add_platformdirs(interp, ...)
+    platform.add_directories(...)
 end
 
 -- get interpreter
@@ -211,11 +195,19 @@ function project.interpreter()
         {
             -- set_xxx
             "set_project"
-        ,   "set_version"
         ,   "set_modes"
             -- add_xxx
         ,   "add_requires"
         ,   "add_repositories"
+        }
+    ,   pathes = 
+        {
+            -- add_xxx
+            "add_packagedirs"
+        }
+    ,   keyvalues =
+        {
+            "set_config"
         }
     ,   custom = 
         {
@@ -227,8 +219,6 @@ function project.interpreter()
         ,   {"is_plat",                 project._api_is_plat          }
         ,   {"is_arch",                 project._api_is_arch          }
         ,   {"is_config",               project._api_is_config        }
-            -- set_xxx
-        ,   {"set_config",              project._api_set_config       }
             -- get_xxx
         ,   {"get_config",              project._api_get_config       }
             -- has_xxx
@@ -237,7 +227,7 @@ function project.interpreter()
             -- add_xxx
         ,   {"add_moduledirs",          project._api_add_moduledirs   }
         ,   {"add_plugindirs",          project._api_add_plugindirs   }
-        ,   {"add_packagedirs",         project._api_add_packagedirs  }
+        ,   {"add_platformdirs",        project._api_add_platformdirs }
         }
     }
 
@@ -279,6 +269,13 @@ function project.interpreter()
             if type(result) == "function" then
                 result = result()
             end
+
+            -- attempt to get it from the platform tools, e.g. cc, cxx, ld ..
+            -- because these values may not exist in config cache when call `config.get()`, we need check and get it.
+            --
+            if not result then
+                result = platform.tool(variable)
+            end
         end
 
         -- ok?
@@ -304,20 +301,56 @@ end
 
 -- get the project info from the given name
 function project.get(name)
+    return project._INFO and project._INFO:get(name) or nil
+end
 
-    -- load the global project infos
-    local infos = project._INFOS 
-    if not infos then
+-- load the project file
+function project._load(force)
 
-        -- load infos
-        infos = project._load_scope(nil, true, true)
-        project._INFOS = infos
+    -- has already been loaded?
+    if project._INFO and not force then
+        return true
     end
 
-    -- get it
-    if infos then
-        return infos[name]
+    -- enter the project directory
+    local oldir, errors = os.cd(os.projectdir())
+    if not oldir then
+        return false, errors
     end
+
+    -- get interpreter
+    local interp = project.interpreter()
+
+    -- load script
+    local ok, errors = interp:load(project.file())
+    if not ok then
+        return false, (errors or "load project file failed!")
+    end
+
+    -- load the root info of the project 
+    local rootinfo, errors = project._load_scope("root", true, true) 
+    if not rootinfo then
+        return false, errors
+    end
+
+    -- load the root info of the target
+    local rootinfo_target, errors = project._load_scope("root.target", true, true) 
+    if not rootinfo_target then
+        return false, errors
+    end
+
+    -- save the root info
+    for name, value in pairs(rootinfo_target:info()) do
+        rootinfo:set("target." .. name, value)
+    end
+    project._INFO = rootinfo
+
+    -- leave the project directory
+    oldir, errors = os.cd(oldir)
+    if not oldir then
+        return false, errors
+    end
+    return true
 end
 
 -- load deps for instance: .e.g option, target and rule
@@ -347,37 +380,103 @@ end
 -- load scope from the project file
 function project._load_scope(scope_kind, remove_repeat, enable_filter)
 
-    -- get interpreter
-    local interp = project.interpreter()
-    assert(interp) 
-
     -- enter the project directory
     local oldir, errors = os.cd(os.projectdir())
     if not oldir then
         return nil, errors
     end
 
-    -- load targets
-    local results, errors = interp:load(project.file(), scope_kind, remove_repeat, enable_filter)
+    -- get interpreter
+    local interp = project.interpreter()
+
+    -- load scope
+    local results, errors = interp:make(scope_kind, remove_repeat, enable_filter)
     if not results then
-        return nil, (errors or "load project file failed!")
+        return nil, errors 
     end
 
     -- leave the project directory
-    local ok, errors = os.cd(oldir)
+    oldir, errors = os.cd(oldir)
+    if not oldir then
+        return nil, errors
+    end
+    return results
+end
+
+-- load tasks
+function project._load_tasks()
+ 
+    -- the project file is not found?
+    if not os.isfile(project.file()) then
+        return {}, nil
+    end
+
+    -- load the project file first
+    local ok, errors = project._load(true)
     if not ok then
         return nil, errors
     end
 
-    -- ok
-    return results
+    -- load the tasks from the the project file
+    local results, errors = project._load_scope("task", true, true)
+    if not results then
+       return nil, errors or "load project tasks failed!"
+    end
+
+    -- bind tasks for menu with an sandbox instance
+    local ok, errors = task._bind(results, project.interpreter())
+    if not ok then
+        return nil, errors
+    end
+
+    -- make task instances
+    local tasks = {}
+    for taskname, taskinfo in pairs(results) do
+        tasks[taskname] = task.new(taskname, taskinfo)
+    end
+    return tasks
+end
+
+-- load rules
+function project._load_rules()
+
+    -- load the project file first if has not been loaded?
+    local ok, errors = project._load()
+    if not ok then
+        return nil, errors
+    end
+ 
+    -- load the rules from the the project file
+    local results, errors = project._load_scope("rule", true, true)
+    if not results then
+        return nil, errors
+    end
+
+    -- make rule instances
+    local rules = {}
+    for rulename, ruleinfo in pairs(results) do
+        rules[rulename] = rule.new(rulename, ruleinfo)
+    end
+
+    -- load rule deps
+    local instances = table.join(rule.rules(), rules)
+    for _, instance in pairs(instances)  do
+        instance._DEPS      = instance._DEPS or {}
+        instance._ORDERDEPS = instance._ORDERDEPS or {}
+        project._load_deps(instance, instances, instance._DEPS, instance._ORDERDEPS)
+    end
+    return rules
 end
 
 -- load targets 
 function project._load_targets()
 
-    -- load all requires first (ensure has_package() works for targets)
+    -- load all requires first and reload the project file to ensure has_package() works for targets
     local requires = project.requires()
+    local ok, errors = project._load(true)
+    if not ok then
+        return nil, errors
+    end
 
     -- load targets
     local results, errors = project._load_scope("target", true, true)
@@ -465,24 +564,72 @@ end
 -- load options
 function project._load_options(disable_filter)
 
+    -- the project file is not found?
+    if not os.isfile(project.file()) then
+        return {}, nil
+    end
+
+    -- reload the project file to ensure `if is_plat() then add_packagedirs() end` works
+    local ok, errors = project._load(true)
+    if not ok then
+        return nil, errors
+    end
+
     -- load the options from the the project file
     local results, errors = project._load_scope("option", true, not disable_filter)
     if not results then
         return nil, errors
     end
 
+    -- load the options from the package directories, e.g. packagedir/*.pkg
+    for _, packagedir in ipairs(table.wrap(project.get("packagedirs"))) do
+        local packagefiles = os.files(path.join(packagedir, "*.pkg", "xmake.lua"))
+        if packagefiles then
+            for _, packagefile in ipairs(packagefiles) do
+
+                -- load the package file
+                local interp = option.interpreter()
+                local ok, errors = interp:load(packagefile)
+                if not ok then
+                    return nil, errors
+                end
+
+                -- load the package options from the the package file
+                local packageinfos, errors = interp:make("option", true, not disable_filter)
+                if not packageinfos then
+                    return nil, errors
+                end
+
+                -- transform includedirs and linkdirs
+                local rootdir = path.directory(packagefile)
+                for _, packageinfo in pairs(packageinfos) do
+                    local linkdirs = {}
+                    local includedirs = {}
+                    for _, linkdir in ipairs(table.wrap(packageinfo:get("linkdirs"))) do
+                        table.insert(linkdirs, path.is_absolute(linkdir) and linkdir or path.join(rootdir, linkdir))
+                    end
+                    for _, includedir in ipairs(table.wrap(packageinfo:get("includedirs"))) do
+                        table.insert(includedirs, path.is_absolute(includedir) and includedir or path.join(rootdir, includedir))
+                    end
+                    if #linkdirs > 0 then
+                        packageinfo:set("linkdirs", linkdirs)
+                    end
+                    if #includedirs > 0 then
+                        packageinfo:set("includedirs", includedirs)
+                    end
+                end
+                table.join2(results, packageinfos)
+            end
+        end
+    end
+
     -- check options
     local options = {}
     for optionname, optioninfo in pairs(results) do
-        
-        -- init a option instance
-        local instance = table.inherit(option)
-        assert(instance)
 
-        -- save name and info
-        instance._NAME = optionname
-        instance._INFO = optioninfo
-
+        -- init an option instance
+        local instance = option.new(optionname, optioninfo)
+      
         -- save it
         options[optionname] = instance
 
@@ -511,8 +658,9 @@ function project._load_requires()
 
     -- parse requires
     local requires = {}
-    local requires_extra = project.get("__extra_requires") or {}
-    for _, requirestr in ipairs(table.wrap(project.get("requires"))) do
+    local requires_str, requires_extra = project.requires_str() 
+    requires_extra = requires_extra or {}
+    for _, requirestr in ipairs(table.wrap(requires_str)) do
 
         -- get the package name
         local packagename = requirestr:split('%s+')[1]
@@ -532,7 +680,7 @@ function project._load_requires()
             instance = table.inherit(requireinfo)
 
             -- save name and info
-            instance._NAME = packagename
+            instance._NAME = alias or packagename
             instance._INFO = { __requirestr = requirestr, __extrainfo = extrainfo }
         end
 
@@ -558,6 +706,19 @@ function project._load_requires()
 
     -- ok?
     return requires
+end
+
+-- load the packages from the the project file and disable filter, we will process filter after a while
+function project._load_packages()
+
+    -- load the project file first if has not been loaded?
+    local ok, errors = project._load()
+    if not ok then
+        return nil, errors
+    end
+ 
+    -- load packages
+    return project._load_scope("package", true, false)
 end
 
 -- clear project cache to reload targets and options
@@ -623,7 +784,6 @@ end
 -- get requires info
 function project.requires()
 
-    -- load requires 
     if not project._REQUIRES then
         local requires, errors = project._load_requires()
         if not requires then
@@ -631,9 +791,26 @@ function project.requires()
         end
         project._REQUIRES = requires
     end
-
-    -- ok
     return project._REQUIRES
+end
+
+-- get string requires 
+function project.requires_str()
+
+    if not project._REQUIRES_STR then
+
+        -- reload the project file to handle `has_config()`
+        local ok, errors = project._load(true)
+        if not ok then
+            os.raise(errors)
+        end
+
+        -- get raw requires
+        local requires_str, requires_extra = project.get("requires"), project.get("__extra_requires")
+        project._REQUIRES_STR = requires_str or false
+        project._REQUIRES_EXTRA = requires_extra
+    end
+    return project._REQUIRES_STR or nil, project._REQUIRES_EXTRA
 end
 
 -- get the given rule
@@ -643,42 +820,17 @@ end
 
 -- get project rules
 function project.rules()
- 
-    -- return it directly if exists
-    if project._RULES then
-        return project._RULES 
+
+    if not project._RULES then
+
+        -- load rules
+        local rules, errors = project._load_rules()
+        if not rules then
+            os.raise(errors)
+        end
+        project._RULES = rules
     end
-
-    -- the project file is not found?
-    if not os.isfile(project.file()) then
-        return {}
-    end
-
-    -- load the rules from the the project file
-    local results, errors = project._load_scope("rule", true, true)
-    if not results then
-        os.raise(errors)
-    end
-
-    -- make rule instances
-    local rules = {}
-    for rulename, ruleinfo in pairs(results) do
-        rules[rulename] = rule.new(rulename, ruleinfo)
-    end
-
-    -- load rule deps
-    local instances = table.join(rule.rules(), rules)
-    for _, instance in pairs(instances)  do
-        instance._DEPS      = instance._DEPS or {}
-        instance._ORDERDEPS = instance._ORDERDEPS or {}
-        project._load_deps(instance, instances, instance._DEPS, instance._ORDERDEPS)
-    end
-
-    -- save it
-    project._RULES = rules
-
-    -- ok?
-    return rules
+    return project._RULES
 end
 
 -- get the given task
@@ -688,66 +840,32 @@ end
 
 -- get tasks
 function project.tasks()
- 
-    -- return it directly if exists
-    if project._TASKS then
-        return project._TASKS 
+
+    if not project._TASKS then
+
+        -- load tasks
+        local tasks, errors = project._load_tasks()
+        if not tasks then
+            os.raise(errors)
+        end
+        project._TASKS = tasks
     end
-
-    -- the project file is not found?
-    if not os.isfile(project.file()) then
-        return {}, nil
-    end
-
-    -- load the tasks from the the project file
-    local results, errors = project._load_scope("task", true, true)
-    if not results then
-       os.raise(errors or "load project tasks failed!")
-    end
-
-    -- bind tasks for menu with an sandbox instance
-    local ok, errors = task._bind(results, project.interpreter())
-    if not ok then
-        os.raise(errors)
-    end
-
-    -- make task instances
-    local tasks = {}
-    for taskname, taskinfo in pairs(results) do
-        tasks[taskname] = task.new(taskname, taskinfo)
-    end
-
-    -- save it
-    project._TASKS = tasks
-
-    -- ok?
-    return tasks
+    return project._TASKS
 end
 
 -- get packages
 function project.packages()
 
-    -- get it from cache first
-    if project._PACKAGES then
-        return project._PACKAGES
+    if not project._PACKAGES then
+
+        -- load packages
+        local packages, errors = project._load_packages()
+        if not packages then
+            return nil, errors
+        end
+        project._PACKAGES = packages
     end
-
-    -- the project file is not found?
-    if not os.isfile(os.projectfile()) then
-        return {}, nil
-    end
-
-    -- load the packages from the the project file and disable filter, we will process filter after a while
-    local results, errors = project._load_scope("package", true, false)
-    if not results then
-        return nil, errors
-    end
-
-    -- save results to cache
-    project._PACKAGES = results
-
-    -- ok?
-    return results
+    return project._PACKAGES
 end
 
 -- get the mtimes

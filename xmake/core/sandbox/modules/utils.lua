@@ -16,7 +16,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 -- 
--- Copyright (C) 2015 - 2018, TBOOX Open Source Group.
+-- Copyright (C) 2015 - 2019, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        utils.lua
@@ -145,14 +145,28 @@ end
 
 -- print the verbose information 
 function sandbox_utils.vprint(format, ...)
-    if option.get("verbose") then
+    if option.get("verbose") or option.get("diagnosis") then
         sandbox_utils.print(format, ...)
     end
 end
 
 -- print the verbose information without newline
 function sandbox_utils.vprintf(format, ...)
-    if option.get("verbose") then
+    if option.get("verbose") or option.get("diagnosis") then
+        sandbox_utils.printf(format, ...)
+    end
+end
+
+-- print the diagnosis information 
+function sandbox_utils.dprint(format, ...)
+    if option.get("diagnosis") then
+        sandbox_utils.print(format, ...)
+    end
+end
+
+-- print the diagnosis information without newline
+function sandbox_utils.dprintf(format, ...)
+    if option.get("diagnosis") then
         sandbox_utils.printf(format, ...)
     end
 end

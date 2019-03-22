@@ -16,7 +16,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 -- 
--- Copyright (C) 2015 - 2018, TBOOX Open Source Group.
+-- Copyright (C) 2015 - 2019, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        find_vcpkgdir.lua
@@ -91,13 +91,13 @@ function main(sdkdir, opt)
 
         -- trace
         if opt.verbose or option.get("verbose") then
-            cprint("checking for the vcpkg directory ... ${green}%s", vcpkg)
+            cprint("checking for the vcpkg directory ... ${color.success}%s", vcpkg)
         end
     else
 
         -- trace
         if opt.verbose or option.get("verbose") then
-            cprint("checking for the vcpkg directory ... ${red}no")
+            cprint("checking for the vcpkg directory ... ${color.nothing}${text.nothing}")
         end
     end
 

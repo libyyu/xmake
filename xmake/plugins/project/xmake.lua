@@ -16,7 +16,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 -- 
--- Copyright (C) 2015 - 2018, TBOOX Open Source Group.
+-- Copyright (C) 2015 - 2019, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        xmake.lua
@@ -44,6 +44,7 @@ task("project")
                 {
                     {'k', "kind",      "kv", "makefile",    "Set the project kind." 
                                                        ,    "    - makefile"
+                                                       ,    "    - xcode"
                                                        ,    "    - compile_commands (clang compilation database with json format)"
                                                        ,    "    - vs2002, vs2003, vs2005, vs2008, vs2010, vs2012, vs2013, vs2015, vs2017" }
                 ,   {'m', "modes",     "kv", nil,           "Set the project modes." 
@@ -51,6 +52,9 @@ task("project")
                                                        ,    "    - xmake project -k makefile"
                                                        ,    "    - xmake project -k compile_commands"
                                                        ,    "    - xmake project -k vs2015 -m \"release,debug\"" }
+                ,   {'a', "archs",     "kv", nil,           "Set the project archs." 
+                                                       ,    "    .e.g "
+                                                       ,    "    - xmake project -k vs2015 -a \"x86,x64\"" }
                 ,   {nil, "outputdir", "v",  ".",           "Set the output directory." }
                 }
             }

@@ -16,7 +16,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 -- 
--- Copyright (C) 2015 - 2018, TBOOX Open Source Group.
+-- Copyright (C) 2015 - 2019, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        uninstall.lua
@@ -27,6 +27,15 @@ import("core.base.task")
 import("core.project.rule")
 import("core.project.project")
 
+-- uninstall files
+function _uninstall_files(target)
+
+    local _, dstfiles = target:installfiles()
+    for _, dstfile in ipairs(dstfiles) do
+        os.vrm(dstfile)
+    end
+end
+
 -- uninstall binary
 function _uninstall_binary(target)
 
@@ -36,10 +45,10 @@ function _uninstall_binary(target)
     end
 
     -- the binary directory
-    local binarydir = path.join(_g.installdir, "bin")
+    local binarydir = path.join(target:installdir(), "bin")
 
     -- remove the target file
-    os.rm(path.join(binarydir, path.filename(target:targetfile())))
+    os.vrm(path.join(binarydir, path.filename(target:targetfile())))
 end
 
 -- uninstall library
@@ -51,18 +60,18 @@ function _uninstall_library(target)
     end
 
     -- the library directory
-    local librarydir = path.join(_g.installdir, "lib")
+    local librarydir = path.join(target:installdir(), "lib")
 
     -- the include directory
-    local includedir = path.join(_g.installdir, "include")
+    local includedir = path.join(target:installdir(), "include")
 
     -- remove the target file
-    os.rm(path.join(librarydir, path.filename(target:targetfile())))
+    os.vrm(path.join(librarydir, path.filename(target:targetfile())))
 
     -- remove headers from the include directory
     local _, dstheaders = target:headerfiles(includedir)
     for _, dstheader in ipairs(dstheaders) do
-        os.rm(dstheader)
+        os.vrm(dstheader)
     end
 end
 
@@ -78,10 +87,13 @@ function _do_uninstall_target(target)
     }
 
     -- call script
-    local script = scripts[target:get("kind")]
+    local script = scripts[target:targetkind()]
     if script then
         script(target)
     end
+
+    -- uninstall the other files
+    _uninstall_files(target)
 end
 
 -- on uninstall target
@@ -91,6 +103,15 @@ function _on_uninstall_target(target)
     if target:get("enabled") == false then
         return 
     end
+
+    -- get install directory
+    local installdir = target:installdir()
+    if not installdir then
+        return 
+    end
+
+    -- trace
+    print("uninstalling %s from %s ...", target:name(), installdir)
 
     -- build target with rules
     local done = false
@@ -184,13 +205,10 @@ function _uninstall_target_and_deps(target)
 end
 
 -- uninstall
-function main(targetname, installdir)
+function main(targetname)
 
     -- init finished states
     _g.finished = {}
-
-    -- init install directory
-    _g.installdir = installdir
 
     -- uninstall given target?
     if targetname then

@@ -16,7 +16,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 -- 
--- Copyright (C) 2015 - 2018, TBOOX Open Source Group.
+-- Copyright (C) 2015 - 2019, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        cache.lua
@@ -42,8 +42,6 @@ function sandbox_lib_detect_cache._instance()
     -- get it
     local detectcache = sandbox_lib_detect_cache._INSTANCE or cache(utils.ifelse(os.isfile(project.file()), "local.detect", "memory.detect"))
     sandbox_lib_detect_cache._INSTANCE = detectcache
-
-    -- ok?
     return detectcache
 end
 

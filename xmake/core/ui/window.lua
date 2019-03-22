@@ -16,7 +16,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 -- 
--- Copyright (C) 2015 - 2018, TBOOX Open Source Group.
+-- Copyright (C) 2015 - 2019, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        window.lua
@@ -43,7 +43,7 @@ function window:init(name, bounds, title, shadow)
     panel.init(self, name, bounds)
 
     -- check bounds
-    assert(self:width() > 4 and self:height() > 3, string.format("%s: too small!", self))
+    assert(self:width() > 4 and self:height() > 3, string.format("%s: too small!", tostring(self)))
 
     -- insert shadow
     if shadow then

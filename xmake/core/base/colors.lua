@@ -16,7 +16,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 -- 
--- Copyright (C) 2015 - 2018, TBOOX Open Source Group.
+-- Copyright (C) 2015 - 2019, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        colors.lua
@@ -26,7 +26,7 @@
 local colors = colors or {}
 
 -- load modules
-local emoji = emoji or require("base/emoji")
+local emoji = require("base/emoji")
 
 -- the color8 keys
 --
@@ -291,6 +291,14 @@ end
 --
 -- "${beer}hello${beer}world"
 --
+-- theme:
+-- "${color.error}"
+-- "${bright color.warning}"
+--
+-- text:
+-- "${hello xmake}"
+-- "${hello xmake $beer}"
+--
 function colors.translate(str)
 
     -- check string
@@ -298,21 +306,19 @@ function colors.translate(str)
         return nil
     end
 
+    -- get theme
+    local theme = colors.theme()
+
     -- patch reset
     str = "${reset}" .. str .. "${reset}"
 
-    -- translate it
-    str = string.gsub(str, "(%${(.-)})", function(_, word) 
+    -- translate color blocks, e.g. ${red}, ${color.xxx}, ${emoji}
+    str = str:gsub("(%${(.-)})", function(_, word) 
 
         -- not supported? ignore it
+        local nocolors = false
         if not colors.color8() and not colors.color256() and not colors.truecolor() then
-            return ""
-        end
-
-        -- attempt to translate to emoji first
-        local emoji_str = emoji.translate(word)
-        if emoji_str then
-            return emoji_str
+            nocolors = true
         end
 
         -- get keys
@@ -321,36 +327,81 @@ function colors.translate(str)
             keys = colors._keys24
         end
 
-        -- make color buffer
-        local buffer = {}
-        for _, key in ipairs(word:split("%s+")) do
+        -- split words
+        local blocks_raw = word:split("%s+")
 
-            -- get the color code
-            local code = keys[key]
-            if not code then
-                if colors.truecolor() and key:find(";", 1, true) then
-                    if key:startswith("on;") then
-                        code = key:gsub("on;", "48;2;")
-                    else
-                        code = "38;2;" .. key
+        -- translate theme color first, e.g ${color.error}
+        local blocks = {}
+        for _, block in ipairs(blocks_raw) do
+            if theme then
+                local theme_block = theme:get(block)
+                if theme_block then
+                    for _, theme_block_sub in ipairs(theme_block:split("%s+")) do
+                        table.insert(blocks, theme_block_sub)
                     end
-                elseif colors.color256() and key:find("#", 1, true) then
-                    if key:startswith("on#") then
-                        code = key:gsub("on#", "48;5;")
-                    else
-                        code = key:gsub("#", "38;5;")
-                    end
-                else
+                else 
+                    table.insert(blocks, block)
                 end
+            elseif block:startswith("color.") or block:startswith("text.") then
+                local default_theme = {["color.error"] = "red", ["color.warning"] = "yellow", ["text.error"] = "error", ["text.warning"] = "warning"}
+                local theme_block = default_theme[block] 
+                if theme_block then
+                    table.insert(blocks, theme_block)
+                else
+                    table.insert(blocks, block)
+                end
+            else
+                table.insert(blocks, block)
             end
-            assert(code, "unknown color: " .. key)
-
-            -- save this code
-            table.insert(buffer, code)
         end
 
-        -- format the color buffer
-        return colors._escape:format(table.concat(buffer, ";"))
+        -- make color buffer
+        local text_buffer = {}
+        local color_buffer = {}
+        for _, block in ipairs(blocks) do
+
+            -- get the color code
+            local code = keys[block]
+            if not code then
+                if colors.truecolor() and block:find(";", 1, true) then
+                    if block:startswith("on;") then
+                        code = block:gsub("on;", "48;2;")
+                    else
+                        code = "38;2;" .. block
+                    end
+                elseif colors.color256() and block:find("#", 1, true) then
+                    if block:startswith("on#") then
+                        code = block:gsub("on#", "48;5;")
+                    else
+                        code = block:gsub("#", "38;5;")
+                    end
+                elseif block:startswith("$") then
+                    -- plain text, do not translate emoji
+                    table.insert(text_buffer, block:sub(2))
+                else
+                    -- get emoji code
+                    local emoji_code = emoji.translate(block)
+                    if emoji_code then
+                        table.insert(text_buffer, emoji_code)
+                    else
+                        table.insert(text_buffer, block)
+                    end
+                end
+            end
+
+            -- save this code
+            table.insert(color_buffer, code)
+        end
+
+        -- make result
+        local result = ""
+        if #color_buffer > 0 and not nocolors then
+            result = result .. colors._escape:format(table.concat(color_buffer, ";")) 
+        end
+        if #text_buffer > 0 then
+            result = result .. table.concat(text_buffer, " ")
+        end
+        return result
     end)
 
     -- ok
@@ -367,6 +418,16 @@ function colors.ignore(str)
 
     -- ignore it
     return (string.gsub(str, "(%${(.-)})", ""))
+end
+
+-- get theme
+function colors.theme()
+    return colors._THEME
+end
+
+-- set theme
+function colors.theme_set(theme)
+    colors._THEME = theme
 end
 
 -- return module

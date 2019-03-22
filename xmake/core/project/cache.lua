@@ -16,7 +16,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 -- 
--- Copyright (C) 2015 - 2018, TBOOX Open Source Group.
+-- Copyright (C) 2015 - 2019, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        cache.lua
@@ -119,11 +119,14 @@ function cache:flush()
 
     -- memory cache? ignore it directly
     if not self._CACHEPATH then
-        return true
+        return 
     end
 
     -- save to file
-    return io.save(self._CACHEPATH, self._CACHEDATA) 
+    local ok, errors = io.save(self._CACHEPATH, self._CACHEDATA) 
+    if not ok then
+        os.raise(errors)
+    end
 end
 
 -- return module

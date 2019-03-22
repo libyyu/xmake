@@ -16,7 +16,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 -- 
--- Copyright (C) 2015 - 2018, TBOOX Open Source Group.
+-- Copyright (C) 2015 - 2019, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        global.lua
@@ -39,8 +39,6 @@ end
 
 -- get the current given configure
 function global.get(name)
-
-    -- get it 
     local value = nil
     if global._CONFIGS then
         value = global._CONFIGS[name]
@@ -48,8 +46,6 @@ function global.get(name)
             value = nil
         end
     end
-
-    -- get it
     return value
 end
 
@@ -96,8 +92,6 @@ function global.options()
             configs[name] = value
         end
     end
-
-    -- get it
     return configs
 end
 
@@ -109,34 +103,27 @@ function global.directory()
     return global._ROOTDIR
 end
 
--- load the global configure
+-- load the global configuration
 function global.load()
 
     -- load configure from the file first
-    local ok = false
     local filepath = global._file()
     if os.isfile(filepath) then
 
         -- load configs
         local results, errors = io.load(filepath)
-
-        -- error?
         if not results then
-            utils.error(errors)
-            return false
+            return false, errors
         end
 
         -- merge the configure 
         for name, value in pairs(results) do
             if global.get(name) == nil then
                 global.set(name, value)
-                ok = true
             end
         end
     end
-
-    -- ok?
-    return ok
+    return true
 end
 
 -- save the global configure
@@ -153,12 +140,23 @@ function global.save()
     return io.save(global._file(), options) 
 end
 
+-- clear config
+function global.clear()
+    global._MODES = nil
+    global._CONFIGS = nil
+end
+
 -- dump the configure
 function global.dump()
-   
-    -- dump
     if not option.get("quiet") then
-        table.dump(global.options(), "__%w*", "configure")
+        utils.print("configure")
+        utils.print("{")
+        for name, value in pairs(global.options()) do
+            if not name:startswith("__") then
+                utils.print("    %s = %s", name, value)
+            end
+        end
+        utils.print("}")
     end
 end
 

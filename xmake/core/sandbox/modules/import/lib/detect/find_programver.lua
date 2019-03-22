@@ -16,7 +16,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 -- 
--- Copyright (C) 2015 - 2018, TBOOX Open Source Group.
+-- Copyright (C) 2015 - 2019, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        find_programver.lua
@@ -78,7 +78,7 @@ function sandbox_lib_detect_find_programver.main(program, opt)
     if type(command) == "function" then
         ok, outdata = sandbox.load(command)
         if not ok and outdata and option.get("diagnosis") then
-            utils.cprint("${yellow}checkinfo: ${clear dim}" .. outdata)
+            utils.cprint("${color.warning}checkinfo: ${clear dim}" .. outdata)
         end
     else
         ok, outdata = os.iorunv(program, {command or "--version"})
@@ -90,7 +90,7 @@ function sandbox_lib_detect_find_programver.main(program, opt)
         if type(parse) == "function" then
             ok, result = sandbox.load(parse, outdata) 
             if not ok and result and option.get("diagnosis") then
-                utils.cprint("${yellow}checkinfo: ${clear dim}" .. result)
+                utils.cprint("${color.warning}checkinfo: ${clear dim}" .. result)
                 result = nil
             end
         elseif parse == nil or type(parse) == "string" then
@@ -105,7 +105,7 @@ function sandbox_lib_detect_find_programver.main(program, opt)
     cacheinfo[program] = utils.ifelse(result, result, false)
 
     -- save cache info
-    cache.save("find_programver", cacheinfo)
+    cache.save(cachekey, cacheinfo)
 
     -- ok?
     return result

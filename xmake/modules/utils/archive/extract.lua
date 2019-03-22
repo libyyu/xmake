@@ -16,7 +16,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 -- 
--- Copyright (C) 2015 - 2018, TBOOX Open Source Group.
+-- Copyright (C) 2015 - 2019, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        extract.lua
@@ -34,7 +34,7 @@ import("detect.tools.find_unzip")
 -- extract archivefile using tar
 function _extract_using_tar(archivefile, outputdir, extension, opt)
 
-    -- the tar of winenv can only extract "*.tar"
+    -- the tar of windows can only extract "*.tar"
     if os.host() == "windows" and extension ~= ".tar" then
         return false
     end

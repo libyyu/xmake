@@ -16,7 +16,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 -- 
--- Copyright (C) 2015 - 2018, TBOOX Open Source Group.
+-- Copyright (C) 2015 - 2019, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        task.lua
@@ -239,13 +239,14 @@ function task._bind(tasks, interp)
     assert(interp) 
 
     -- bind sandbox for menus
-    for _, taskinfo in pairs(tasks) do
+    for _, taskinst in pairs(tasks) do
 
-        -- has menu?
-        if taskinfo.menu then
+        -- has task menu?
+        local taskmenu = taskinst:get("menu")
+        if taskmenu then
 
             -- translate options
-            local options = taskinfo.menu.options
+            local options = taskmenu.options
             if options then
             
                 -- make full options 
@@ -267,7 +268,7 @@ function task._bind(tasks, interp)
 
                 -- update the options
                 options = options_full
-                taskinfo.menu.options = options_full
+                taskmenu.options = options_full
 
                 -- bind sandbox for scripts in option 
                 for _, opt in ipairs(options) do
@@ -317,9 +318,15 @@ function task._load(filepath)
     local interp = task._interpreter()
     assert(interp) 
 
+    -- load script
+    local ok, errors = interp:load(filepath)
+    if not ok and os.isfile(filepath) then
+        return nil, errors
+    end
+
     -- load tasks
-    local tasks, errors = interp:load(filepath, "task", true, true)
-    if not tasks and os.isfile(filepath) then
+    local tasks, errors = interp:make("task", true, true)
+    if not tasks then
         return nil, errors
     end
 
@@ -358,16 +365,9 @@ end
 
 -- new a task instance
 function task.new(name, info)
-
-    -- init a task instance
     local instance = table.inherit(task)
-    assert(instance)
-
-    -- save name and info
     instance._NAME = name
     instance._INFO = info
-
-    -- ok?
     return instance
 end
 
@@ -427,8 +427,9 @@ function task.menu(tasks)
     local menu = {}
     for taskname, taskinst in pairs(tasks) do
 
-        -- has menu?
-        if taskinst:get("menu") then
+        -- has task menu?
+        local taskmenu = taskinst:get("menu")
+        if taskmenu then
 
             -- main?
             if taskinst:get("category") == "main" then
@@ -437,7 +438,7 @@ function task.menu(tasks)
                 menu.main = function ()
 
                     -- translate main menu
-                    local mainmenu, errors = task._translate_menu(taskinst:get("menu"))
+                    local mainmenu, errors = task._translate_menu(taskmenu)
                     if not mainmenu then
                         os.raise(errors)
                     end
@@ -467,7 +468,7 @@ function task.menu(tasks)
 
             -- delay to load task menu
             menu[taskname] = function ()
-                local taskmenu, errors = task._translate_menu(taskinst:get("menu"))
+                local taskmenu, errors = task._translate_menu(taskmenu)
                 if not taskmenu then
                     os.raise(errors)
                 end
@@ -482,7 +483,7 @@ end
 
 -- get the task info
 function task:get(name)
-    return self._INFO[name]
+    return self._INFO:get(name)
 end
 
 -- get the task name

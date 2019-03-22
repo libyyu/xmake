@@ -16,7 +16,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 -- 
--- Copyright (C) 2015 - 2018, TBOOX Open Source Group.
+-- Copyright (C) 2015 - 2019, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        main.lua
@@ -25,17 +25,22 @@
 -- imports
 import("core.base.option")
 import("core.base.global")
+import("menuconf", {alias = "menuconf_show"})
 
 -- main
 function main()
+
+    -- enter menu config
+    if option.get("menu") then
+        menuconf_show()
+    end
 
     -- load the global configure
     --
     -- priority: option > option_default > config_check > global_cache 
     --
-    local configcache = false
-    if not option.get("clean") then
-        configcache = global.load() 
+    if option.get("clean") then
+        global.clear() 
     end
 
     -- override the option configure 
@@ -58,7 +63,7 @@ function main()
     end
 
     -- check the global configure 
-    if changed or not configcache then
+    if changed or option.get("clean") then
         global.check()
     end
   

@@ -16,7 +16,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 -- 
--- Copyright (C) 2015 - 2018, TBOOX Open Source Group.
+-- Copyright (C) 2015 - 2019, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        find_ndk.lua
@@ -142,9 +142,9 @@ function main(sdkdir, opt)
     opt = opt or {}
 
     -- attempt to load cache first
-    local key = "detect.sdks.find_ndk." .. (sdkdir or "")
+    local key = "detect.sdks.find_ndk"
     local cacheinfo = cache.load(key)
-    if not opt.force and cacheinfo.ndk then
+    if not opt.force and cacheinfo.ndk and cacheinfo.ndk.sdkdir and os.isdir(cacheinfo.ndk.sdkdir) then
         return cacheinfo.ndk
     end
 
@@ -152,8 +152,8 @@ function main(sdkdir, opt)
     local arch = opt.arch or config.get("arch") or "armv7-a"
        
     -- find ndk
-    local ndk = _find_ndk(sdkdir or config.get("ndk") or global.get("ndk"), arch, opt.sdkver or config.get("ndk_sdkver"), opt.toolchains_ver or config.get("ndk_toolchains_ver"))
-    if ndk then
+    local ndk = _find_ndk(sdkdir or config.get("ndk") or global.get("ndk") or config.get("sdk"), arch, opt.sdkver or config.get("ndk_sdkver"), opt.toolchains_ver or config.get("ndk_toolchains_ver"))
+    if ndk and ndk.sdkdir then
 
         -- save to config
         config.set("ndk", ndk.sdkdir, {force = true, readonly = true})
@@ -162,15 +162,15 @@ function main(sdkdir, opt)
 
         -- trace
         if opt.verbose or option.get("verbose") then
-            cprint("checking for the NDK directory ... ${green}%s", ndk.sdkdir)
-            cprint("checking for the SDK version of NDK ... ${green}%s", ndk.sdkver)
-            cprint("checking for the toolchains version of NDK ... ${green}%s", ndk.toolchains_ver)
+            cprint("checking for the NDK directory ... ${color.success}%s", ndk.sdkdir)
+            cprint("checking for the SDK version of NDK ... ${color.success}%s", ndk.sdkver)
+            cprint("checking for the toolchains version of NDK ... ${color.success}%s", ndk.toolchains_ver)
         end
     else
 
         -- trace
         if opt.verbose or option.get("verbose") then
-            cprint("checking for the NDK directory ... ${red}no")
+            cprint("checking for the NDK directory ... ${color.nothing}${text.nothing}")
         end
     end
 

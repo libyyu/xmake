@@ -16,7 +16,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 -- 
--- Copyright (C) 2015 - 2018, TBOOX Open Source Group.
+-- Copyright (C) 2015 - 2019, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        check_cxsnippets.lua
@@ -93,7 +93,7 @@ function _sourcecode(snippets, opt)
     sourcecode = sourcecode .. "\n"
 
     -- add snippets
-    for _, snippet in ipairs(snippets) do
+    for _, snippet in pairs(snippets) do
         sourcecode = sourcecode .. "\n" .. snippet
     end
     sourcecode = sourcecode .. "\n"
@@ -133,6 +133,7 @@ end
 -- @code
 -- local ok = check_cxsnippets("void test() {}")
 -- local ok = check_cxsnippets({"void test(){}", "#define TEST 1"}, {types = "wchar_t", includes = "stdio.h"})
+-- local ok = check_cxsnippets({snippet_name = "void test(){}", "#define TEST 1"}, {types = "wchar_t", includes = "stdio.h"})
 -- @endcode
 --
 function main(snippets, opt)
@@ -200,23 +201,27 @@ function main(snippets, opt)
     if opt.verbose or option.get("verbose") or option.get("diagnosis") then
         local kind = ifelse(sourcekind == "cc", "c", "c++")
         if #includes > 0 then
-            cprint("checking for the %s includes %s ... %s", kind, table.concat(includes, ", "), ifelse(ok, "${green}ok", "${red}no"))
+            cprint("${dim}> checking for the %s includes(%s)", kind, table.concat(includes, ", "))
         end
         if #types > 0 then
-            cprint("checking for the %s types %s ... %s", kind, table.concat(types, ", "), ifelse(ok, "${green}ok", "${red}no"))
+            cprint("${dim}> checking for the %s types(%s)", kind, table.concat(types, ", "))
         end
         if #funcs > 0 then
-            cprint("checking for the %s funcs %s ... %s", kind, table.concat(funcs, ", "), ifelse(ok, "${green}ok", "${red}no"))
+            cprint("${dim}> checking for the %s funcs(%s)", kind, table.concat(funcs, ", "))
         end
         if #links > 0 then
-            cprint("checking for the %s links %s ... %s", kind, table.concat(links, ", "), ifelse(ok, "${green}ok", "${red}no"))
+            cprint("${dim}> checking for the %s links(%s)", kind, table.concat(links, ", "))
         end
-        for _, snippet in ipairs(snippets) do
-            cprint("checking for the %s snippet %s ... %s", kind, snippet:sub(1, 16), ifelse(ok, "${green}ok", "${red}no"))
+        for idx_or_name, snippet in pairs(snippets) do
+            local name = idx_or_name
+            if type(name) == "number" then
+                name = snippet:sub(1, 16)
+            end
+            cprint("${dim}> checking for the %s snippet(%s)", kind, name)
         end
     end
     if errors and #errors > 0 and option.get("diagnosis") then
-        cprint("${yellow}checkinfo:${clear dim} %s", errors)
+        cprint("${color.warning}checkinfo:${clear dim} %s", errors)
     end
 
     -- ok?

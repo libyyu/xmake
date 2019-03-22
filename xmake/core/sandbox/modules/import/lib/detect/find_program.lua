@@ -16,7 +16,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 -- 
--- Copyright (C) 2015 - 2018, TBOOX Open Source Group.
+-- Copyright (C) 2015 - 2019, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        find_program.lua
@@ -72,15 +72,15 @@ function sandbox_lib_detect_find_program._check(program, opt)
 
     -- check failed? print verbose error info
     if not ok and option.get("diagnosis") then
-        utils.cprint("${yellow}checkinfo: ${clear dim}" .. errors)
+        utils.cprint("${color.warning}checkinfo: ${clear dim}" .. errors)
     end
 
     -- ok?
     return ok
 end
 
--- find program
-function sandbox_lib_detect_find_program._find(name, pathes, opt)
+-- find program from the given pathes
+function sandbox_lib_detect_find_program._find_from_pathes(name, pathes, opt)
 
     -- attempt to check it from the given directories
     if not path.is_absolute(name) then
@@ -115,6 +115,16 @@ function sandbox_lib_detect_find_program._find(name, pathes, opt)
             end
         end
     end
+end
+
+-- find program
+function sandbox_lib_detect_find_program._find(name, pathes, opt)
+
+    -- attempt to check it from the given directories
+    local program_path = sandbox_lib_detect_find_program._find_from_pathes(name, pathes, opt)
+    if program_path then
+        return program_path
+    end
 
     -- attempt to check it from regists
     if os.host() == "windows" then
@@ -122,7 +132,7 @@ function sandbox_lib_detect_find_program._find(name, pathes, opt)
         if not program_name:endswith(".exe") then
             program_name = program_name .. ".exe"
         end
-        local program_path = winos.registry_query("HKEY_LOCAL_MACHINE\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\App Paths\\" .. program_name)
+        program_path = winos.registry_query("HKEY_LOCAL_MACHINE\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\App Paths\\" .. program_name)
         if program_path then
             -- check it
             program_path = program_path:trim()
@@ -143,6 +153,19 @@ function sandbox_lib_detect_find_program._find(name, pathes, opt)
                     return program_path
                 end
             end
+        end
+    end
+
+    -- attempt to check it from the some default system directories
+    local syspathes = {}
+    if os.host() ~= "windows" then
+        table.insert(syspathes, "/usr/local/bin")
+        table.insert(syspathes, "/usr/bin")
+    end
+    if #syspathes > 0 then
+        program_path = sandbox_lib_detect_find_program._find_from_pathes(name, syspathes, opt)
+        if program_path then
+            return program_path
         end
     end
 
@@ -204,29 +227,23 @@ function sandbox_lib_detect_find_program.main(name, opt)
         return utils.ifelse(result, result, nil)
     end
 
-    -- add default search pathes 
-    local pathes = opt.pathes
-    if os.host() ~= "windows" then
-        pathes = table.join(table.wrap(pathes), "/usr/local/bin", "/usr/bin")
-    end
-
     -- find executable program
     checking = utils.ifelse(coroutine_running, name, nil)
-    result = sandbox_lib_detect_find_program._find(name, pathes, opt) 
+    result = sandbox_lib_detect_find_program._find(name, opt.pathes, opt) 
     checking = nil
 
     -- cache result
     cacheinfo[name] = utils.ifelse(result, result, false)
 
     -- save cache info
-    cache.save("find_program", cacheinfo)
+    cache.save(cachekey, cacheinfo)
 
     -- trace
     if option.get("verbose") or opt.verbose then
         if result then
-            utils.cprint("checking for the %s ... ${green}%s", name, utils.ifelse(name == result, "ok", result))
+            utils.cprint("checking for the %s ... ${color.success}%s", name, utils.ifelse(name == result, "${text.success}", result))
         else
-            utils.cprint("checking for the %s ... ${red}no", name)
+            utils.cprint("checking for the %s ... ${color.nothing}${text.nothing}", name)
         end
     end
 

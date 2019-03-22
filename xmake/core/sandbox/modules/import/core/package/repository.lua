@@ -16,7 +16,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 -- 
--- Copyright (C) 2015 - 2018, TBOOX Open Source Group.
+-- Copyright (C) 2015 - 2019, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        repository.lua
@@ -82,7 +82,7 @@ function sandbox_core_package_repository.repositories(is_global)
         import("net.fasturl")
 
         -- sort main urls
-        local mainurls = {"https://github.com/tboox/xmake-repo.git", "https://gitlab.com/tboox/xmake-repo.git", "https://gitee.com/tboox/xmake-repo.git"}
+        local mainurls = {"https://github.com/xmake-io/xmake-repo.git", "https://gitlab.com/tboox/xmake-repo.git", "https://gitee.com/tboox/xmake-repo.git"}
         fasturl.add(mainurls)
         mainurls = fasturl.sort(mainurls)
 

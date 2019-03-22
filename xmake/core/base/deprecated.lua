@@ -16,7 +16,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 -- 
--- Copyright (C) 2015 - 2018, TBOOX Open Source Group.
+-- Copyright (C) 2015 - 2019, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        deprecated.lua
@@ -39,7 +39,7 @@ function deprecated.add(newformat, oldformat, ...)
 
     -- the old and new entries
     local old = string.format(oldformat, ...)
-    local new = string.format(newformat, ...)
+    local new = newformat and string.format(newformat, ...) or false
 
     -- add it
     deprecated._ENTRIES[old] = new
@@ -48,28 +48,26 @@ end
 -- dump all deprecated entries
 function deprecated.dump()
 
-    -- the entries
-    deprecated._ENTRIES = deprecated._ENTRIES or {}
-
-    -- dump all
+    -- dump one or more ..
     local index = 0
+    deprecated._ENTRIES = deprecated._ENTRIES or {}
     for old, new in pairs(deprecated._ENTRIES) do
 
-        -- trace newline
+        -- trace
         if index == 0 then
             print("")
         end
-
-        -- trace
-        utils.cprint("${bright yellow}deprecated: ${default yellow}please uses %s instead of %s", new, old)
-
-        -- too much?
-        if index > 6 and not option.get("verbose") then
-            utils.cprint("${bright yellow}deprecated: ${default yellow}add -v for getting more ..")
-            break
+        if new then
+            utils.cprint("${bright color.warning}deprecated: ${clear}please uses %s instead of %s", new, old)
+        else
+            utils.cprint("${bright color.warning}deprecated: ${clear}please remove %s", old)
         end
 
-        -- update index
+        -- show more?
+        if not option.get("verbose") then
+            utils.cprint("${bright color.warning}deprecated: ${clear}add -v for getting more ..")
+            break
+        end
         index = index + 1
     end
 end

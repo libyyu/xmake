@@ -16,7 +16,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 -- 
--- Copyright (C) 2015 - 2018, TBOOX Open Source Group.
+-- Copyright (C) 2015 - 2019, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        main.lua
@@ -26,7 +26,8 @@
 import("core.base.option")
 import("core.base.task")
 import("core.platform.environment")
-import("makefile.makefile")
+import("make.makefile")
+import("cmake.cmakelists")
 import("vstudio.vs2002")
 import("vstudio.vs2003")
 import("vstudio.vs2005")
@@ -36,7 +37,9 @@ import("vstudio.vs2012")
 import("vstudio.vs2013")
 import("vstudio.vs2015")
 import("vstudio.vs2017")
+import("vstudio.vs2019")
 import("clang.compile_commands")
+import("xcode.xcodeproj")
 
 -- make project
 function _make(kind)
@@ -45,6 +48,7 @@ function _make(kind)
     local maps = 
     {
         makefile         = makefile.make
+    ,   cmakelists       = cmakelists.make
     ,   vs2002           = vs2002.make
     ,   vs2003           = vs2003.make
     ,   vs2005           = vs2005.make
@@ -54,7 +58,9 @@ function _make(kind)
     ,   vs2013           = vs2013.make
     ,   vs2015           = vs2015.make
     ,   vs2017           = vs2017.make
+    ,   vs2019           = vs2019.make
     ,   compile_commands = compile_commands.make
+    ,   xcode            = xcodeproj.make
     }
     assert(maps[kind], "the project kind(%s) is not supported!", kind)
     

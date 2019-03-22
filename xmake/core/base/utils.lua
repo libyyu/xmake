@@ -16,7 +16,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 -- 
--- Copyright (C) 2015 - 2018, TBOOX Open Source Group.
+-- Copyright (C) 2015 - 2019, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        utils.lua
@@ -135,14 +135,14 @@ end
 
 -- print the verbose information
 function utils.vprint(format, ...)
-    if option.get("verbose") and format ~= nil then
+    if (option.get("verbose") or option.get("diagnosis")) and format ~= nil then
         utils.print(format, ...)
     end
 end
 
 -- print the verbose information without newline
 function utils.vprintf(format, ...)
-    if option.get("verbose") and format ~= nil then
+    if (option.get("verbose") or option.get("diagnosis")) and format ~= nil then
         utils.printf(format, ...)
     end
 end
@@ -150,7 +150,7 @@ end
 -- print the error information
 function utils.error(format, ...)
     if format ~= nil then
-        utils.cprint("${bright red}error: ${clear}" .. string.tryformat(format, ...))
+        utils.cprint("${bright color.error}${text.error}: ${clear}" .. string.tryformat(format, ...))
         log:flush()
     end
 end
@@ -162,7 +162,7 @@ function utils.warning(format, ...)
     assert(format)
 
     -- format message
-    local msg = "${bright yellow}warning: ${default yellow}" .. string.tryformat(format, ...)
+    local msg = "${bright color.warning}${text.warning}: ${color.warning}" .. string.tryformat(format, ...)
 
     -- init warnings
     utils._WARNINGS = utils._WARNINGS or {}

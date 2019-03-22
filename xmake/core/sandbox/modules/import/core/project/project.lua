@@ -16,7 +16,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 -- 
--- Copyright (C) 2015 - 2018, TBOOX Open Source Group.
+-- Copyright (C) 2015 - 2019, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        project.lua
@@ -157,27 +157,6 @@ function sandbox_core_project.mtimes()
     return project.mtimes()
 end
 
--- get the project version
-function sandbox_core_project.version()
-
-    -- get version and build version
-    local version = project.get("version")
-    local version_build = sandbox_core_project._version_build
-    if version then
-        local version_extra = project.get("__extra_version")
-        if version_extra then
-            version_build = table.wrap(version_extra[version]).build
-            if type(version_build) == "string" then
-                version_build = os.date(version_build, os.time())
-                sandbox_core_project._version_build = version_build
-            end
-        end
-    end
-
-    -- ok?
-    return version, version_build
-end
-
 -- get the project info from the given name
 function sandbox_core_project.get(name)
     return project.get(name)
@@ -188,9 +167,23 @@ function sandbox_core_project.name()
     return project.get("project")
 end
 
+-- get the project version, the root version of the target scope
+function sandbox_core_project.version()
+    return project.get("target.version")
+end
+
 -- get the project modes
 function sandbox_core_project.modes()
-    return project.get("modes")
+    local modes = project.get("modes") or {}
+    for _, target in pairs(table.wrap(project.targets())) do
+        for _, rule in ipairs(target:orderules()) do
+            local name = rule:name()
+            if name:startswith("mode.") then
+                table.insert(modes, name:sub(6))
+            end
+        end
+    end
+    return table.unique(modes)
 end
 
 -- get the the given require info
@@ -201,6 +194,11 @@ end
 -- get the all requires
 function sandbox_core_project.requires()
     return project.requires()
+end
+
+-- get the all raw string requires
+function sandbox_core_project.requires_str()
+    return project.requires_str()
 end
 
 -- return module

@@ -16,7 +16,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 -- 
--- Copyright (C) 2015 - 2018, TBOOX Open Source Group.
+-- Copyright (C) 2015 - 2019, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        builder.lua
@@ -54,7 +54,7 @@ function builder:_targetkind()
 end
 
 -- map gcc flag to the given builder flag
-function builder:_mapflag(flag, mapflags)
+function builder:_mapflag(flag, flagkind, mapflags)
 
     -- attempt to map it directly
     local flag_mapped = mapflags[flag]
@@ -71,13 +71,13 @@ function builder:_mapflag(flag, mapflags)
     end
 
     -- has this flag?
-    if self:has_flags(flag) then
+    if self:has_flags(flag, flagkind) then
         return flag
     end
 end
 
 -- map gcc flags to the given builder flags
-function builder:_mapflags(flags)
+function builder:_mapflags(flags, flagkind)
 
     -- wrap flags first
     flags = table.wrap(flags)
@@ -89,7 +89,7 @@ function builder:_mapflags(flags)
 
         -- map flags
         for _, flag in pairs(flags) do
-            local flag_mapped = self:_mapflag(flag, mapflags)
+            local flag_mapped = self:_mapflag(flag, flagkind, mapflags)
             if flag_mapped then
                 table.insert(results, flag_mapped)
             end
@@ -99,7 +99,7 @@ function builder:_mapflags(flags)
 
         -- has flags?
         for _, flag in pairs(flags) do
-            if self:has_flags(flag) then
+            if self:has_flags(flag, flagkind) then
                 table.insert(results, flag)
             end
         end
@@ -117,7 +117,7 @@ end
 
 -- inherts from target packages
 function builder:_inherit_from_targetpkgs(values, target, name)
-    for _, pkg in ipairs(target:packages()) do
+    for _, pkg in ipairs(target:orderpkgs()) do
         -- uses them instead of the builtin configs if exists extra package config
         -- e.g. `add_packages("xxx", {links = "xxx"})`
         local configinfo = target:pkgconfig(pkg:name())
@@ -134,7 +134,7 @@ end
 function builder:_inherit_from_target(values, target, name)
     table.join2(values, target:get(name))
     if target:type() == "target" then
-        for _, opt in ipairs(target:options()) do
+        for _, opt in ipairs(target:orderopts()) do
             table.join2(values, opt:get(name))
         end
         self:_inherit_from_targetpkgs(values, target, name)
@@ -153,8 +153,8 @@ function builder:_inherit_from_targetdeps(results, target, flagname)
         local dep = orderdeps[total + 1 - idx]
 
         -- is static or shared target library? link it
-        local depkind      = dep:get("kind")
-        local targetkind   = target:get("kind")
+        local depkind      = dep:targetkind()
+        local targetkind   = target:targetkind()
         local depconfig    = table.wrap(target:depconfig(dep:name()))
         if (depkind == "static" or depkind == "shared" or depkind == "object") and (depconfig.inherit == nil or depconfig.inherit) then
             if (flagname == "links" or flagname == "syslinks") and (targetkind == "binary" or targetkind == "shared") then
@@ -191,9 +191,15 @@ function builder:_inherit_from_targetdeps(results, target, flagname)
 
             elseif flagname == "includedirs" then
 
-                -- add dependent headerdir
+                -- TODO add dependent headerdir (deprecated)
                 if dep:get("headers") and os.isdir(dep:headerdir()) then
                     table.insert(results, dep:headerdir())
+                end
+
+                -- add dependent header directories
+                local headerdirs = dep:get("headerdirs")
+                if headerdirs then
+                    table.join2(results, headerdirs)
                 end
                 
                 -- add dependent configheader directory
@@ -216,14 +222,14 @@ end
 -- add flags from the option 
 function builder:_addflags_from_option(flags, opt)
     for _, flagkind in ipairs(self:_flagkinds()) do
-        table.join2(flags, self:_mapflags(opt:get(flagkind)))
+        table.join2(flags, self:_mapflags(opt:get(flagkind), flagkind))
     end
 end
 
 -- add flags from the package 
 function builder:_addflags_from_package(flags, pkg)
     for _, flagkind in ipairs(self:_flagkinds()) do
-        table.join2(flags, self:_mapflags(pkg:get(flagkind)))
+        table.join2(flags, self:_mapflags(pkg:get(flagkind), flagkind))
     end
 end
 
@@ -252,12 +258,12 @@ function builder:_addflags_from_target(flags, target)
         if target:type() == "target" then
 
             -- add flags from options
-            for _, opt in ipairs(target:options()) do
+            for _, opt in ipairs(target:orderopts()) do
                 self:_addflags_from_option(targetflags, opt)
             end
 
             -- add flags from packages
-            for _, pkg in ipairs(target:packages()) do
+            for _, pkg in ipairs(target:orderpkgs()) do
                 self:_addflags_from_package(targetflags, pkg)
             end
         end
@@ -273,11 +279,11 @@ function builder:_addflags_from_target(flags, target)
                     if (flagextra[flag] or {}).force then
                         table.join2(targetflags, flag)
                     else
-                        table.join2(targetflags, self:_mapflags(flag))
+                        table.join2(targetflags, self:_mapflags(flag, flagkind))
                     end
                 end
             else
-                table.join2(targetflags, self:_mapflags(flags))
+                table.join2(targetflags, self:_mapflags(flags, flagkind))
             end
         end
 
@@ -296,7 +302,7 @@ function builder:_addflags_from_argument(flags, target, args)
     for _, flagkind in ipairs(self:_flagkinds()) do
 
         -- add auto mapping flags
-        table.join2(flags, self:_mapflags(args[flagkind]))
+        table.join2(flags, self:_mapflags(args[flagkind], flagkind))
 
         -- add original flags
         local original_flags = (args.force or {})[flagkind]
@@ -343,7 +349,7 @@ function builder:_addflags_from_language(flags, target, getters)
                             -- is target? get flagvalues of the attached options and packages
                             local results = {}
                             if target:type() == "target" then
-                                for _, opt in ipairs(target:options()) do
+                                for _, opt in ipairs(target:orderopts()) do
                                     table.join2(results, table.wrap(opt:get(name)))
                                 end
                                 self:_inherit_from_targetpkgs(results, target, name)
@@ -445,8 +451,8 @@ function builder:get(name)
 end
 
 -- has flags?
-function builder:has_flags(flags)
-    return self:_tool():has_flags(flags)
+function builder:has_flags(flags, flagkind)
+    return self:_tool():has_flags(flags, flagkind)
 end
 
 -- get the format of the given target kind 

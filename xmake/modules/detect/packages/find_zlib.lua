@@ -16,7 +16,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 -- 
--- Copyright (C) 2015 - 2018, TBOOX Open Source Group.
+-- Copyright (C) 2015 - 2019, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        find_zlib.lua
@@ -63,14 +63,12 @@ function main(opt)
             -- save include directory
             table.insert(result.includedirs, includedir)
 
-            -- match version
-            if opt.version then
-                local zlib_h = io.readfile(path.join(includedir, "zlib.h"))
-                if zlib_h then
-                    local version = zlib_h:match("#define ZLIB_VERSION \"(%d+%.?%d+%.?%d+)\"")
-                    if version ~= opt.version then
-                        return 
-                    end
+            -- get version
+            local zlib_h = io.readfile(path.join(includedir, "zlib.h"))
+            if zlib_h then
+                local version = zlib_h:match("#define ZLIB_VERSION \"(%d+%.?%d+%.?%d+)\"")
+                if version then
+                    result.version = version
                 end
             end
         end

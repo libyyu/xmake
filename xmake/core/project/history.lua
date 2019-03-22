@@ -16,7 +16,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 -- 
--- Copyright (C) 2015 - 2018, TBOOX Open Source Group.
+-- Copyright (C) 2015 - 2019, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        history.lua
@@ -89,8 +89,6 @@ end
 
 -- load history 
 function history:load(key)
-
-    -- load it
     return self._CACHE:get(key)
 end
 

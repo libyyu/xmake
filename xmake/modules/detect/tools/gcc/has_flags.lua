@@ -16,7 +16,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 -- 
--- Copyright (C) 2015 - 2018, TBOOX Open Source Group.
+-- Copyright (C) 2015 - 2019, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        has_flags.lua
@@ -94,7 +94,8 @@ function _check_try_running(flags, opt, islinker)
     if islinker then
 
         -- get extension
-        local extension = table.wrap(language.sourcekinds()[opt.toolkind or "cc"])[1] or ".c"
+        -- @note we need detect extension for ndk/clang++.exe: warning: treating 'c' input as 'c++' when in C++ mode, this behavior is deprecated [-Wdeprecated]
+        local extension = opt.program:endswith("++") and ".cpp" or (table.wrap(language.sourcekinds()[opt.toolkind or "cc"])[1] or ".c")
 
         -- make an stub source file
         local sourcefile = path.join(os.tmpdir(), "detect", "gcc_has_flags" .. extension)

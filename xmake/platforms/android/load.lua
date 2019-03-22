@@ -16,7 +16,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 -- 
--- Copyright (C) 2015 - 2018, TBOOX Open Source Group.
+-- Copyright (C) 2015 - 2019, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        load.lua
@@ -172,12 +172,26 @@ function main(platform)
                 platform:add("cxxflags", format("-I%s/libs/%s/include", cxxstl_sdkdir, toolchains_archs[arch]))
                 platform:add("ldflags", format("-L%s/libs/%s", cxxstl_sdkdir, toolchains_archs[arch]))
                 platform:add("shflags", format("-L%s/libs/%s", cxxstl_sdkdir, toolchains_archs[arch]))
+                
+                -- link to c++ std library
                 if cxxstl_sdkdir:find("llvm-libc++", 1, true) then
                     platform:add("ldflags", "-lc++_static", "-lc++abi")
                     platform:add("shflags", "-lc++_static", "-lc++abi")
                 else
                     platform:add("ldflags", "-lgnustl_static")
                     platform:add("shflags", "-lgnustl_static")
+                end
+                
+                -- include abi directory
+                if cxxstl_sdkdir:find("llvm-libc++", 1, true) then
+                    local abi_path = path.join(ndk, "sources", "cxx-stl", "llvm-libc++abi")
+                    local before_r13 = path.join(abi_path, "libcxxabi")
+                    local after_r13 = path.join(abi_path, "include")
+                    if os.isdir(before_r13) then
+                        platform:add("cxxflags", "-I" .. before_r13)
+                    elseif os.isdir(after_r13) then
+                        platform:add("cxxflags", "-I" .. after_r13)
+                    end
                 end
             end
         end

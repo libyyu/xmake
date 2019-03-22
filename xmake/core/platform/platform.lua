@@ -16,7 +16,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 -- 
--- Copyright (C) 2015 - 2018, TBOOX Open Source Group.
+-- Copyright (C) 2015 - 2019, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        platform.lua
@@ -38,16 +38,10 @@ local global        = require("base/global")
 
 -- new an instance
 function _instance.new(name, info, rootdir)
-
-    -- new an instance
-    local instance = table.inherit(_instance)
-
-    -- init instance
-    instance._NAME      = name
-    instance._INFO      = info
-    instance._ROOTDIR   = rootdir
-
-    -- ok
+    local instance    = table.inherit(_instance)
+    instance._NAME    = name
+    instance._INFO    = info
+    instance._ROOTDIR = rootdir
     return instance
 end
 
@@ -56,29 +50,28 @@ function _instance:name()
     return self._NAME
 end
 
--- set the value to the platform info
+-- set the value to the platform configuration
 function _instance:set(name, ...)
-    self._INFO[name] = table.unwrap({...})
+    self._INFO:apival_set(name, ...)
 end
 
--- add the value to the platform info
+-- add the value to the platform configuration
 function _instance:add(name, ...)
-    local info = table.wrap(self._INFO[name])
-    self._INFO[name] = table.unwrap(table.join(info, ...))
+    self._INFO:apival_add(name, ...)
 end
 
--- get the platform configure
+-- get the platform configuration
 function _instance:get(name)
 
     -- attempt to get the static configure value
-    local value = self._INFO[name]
+    local value = self._INFO:get(name)
     if value ~= nil then
         return value
     end
 
-    -- lazy loading platform
-    if not self._LOADED then
-        local on_load = self._INFO.load
+    -- lazy loading platform if get other configuration
+    if not self._LOADED and not self:_is_builtin_conf(name) then
+        local on_load = self._INFO:get("load")
         if on_load then
             local ok, errors = sandbox.load(on_load, self)
             if not ok then
@@ -89,37 +82,67 @@ function _instance:get(name)
     end
 
     -- get other platform info
-    return self._INFO[name]
+    return self._INFO:get(name)
 end
 
 -- get the platform os
 function _instance:os()
-    return self:get("os")
+    return self._INFO:get("os")
 end
 
 -- get the platform menu
 function _instance:menu()
-    return self:get("menu")
+    -- @note do not use self:get("menu") to avoid loading platform early
+    return self._INFO:get("menu")
 end
 
 -- get the platform hosts
 function _instance:hosts()
-    return self:get("hosts")
+    return self._INFO:get("hosts")
 end
 
 -- get the platform archs
 function _instance:archs()
-    return self:get("archs")
+    return self._INFO:get("archs")
 end
 
--- the directories of platform
-function platform._directories()
+-- get the platform script
+function _instance:script(name)
+    return self._INFO:get(name)
+end
 
-    -- the directories
-    return  {   path.join(config.directory(), "platforms")
-            ,   path.join(global.directory(), "platforms")
-            ,   path.join(os.programdir(), "platforms")
-            }
+-- get user private data
+function _instance:data(name)
+    return self._DATA and self._DATA[name] or nil
+end
+
+-- set user private data
+function _instance:data_set(name, data)
+    self._DATA = self._DATA or {}
+    self._DATA[name] = data
+end
+
+-- add user private data
+function _instance:data_add(name, data)
+    self._DATA = self._DATA or {}
+    self._DATA[name] = table.unwrap(table.join(self._DATA[name] or {}, data))
+end
+
+-- is builtin configuration?
+function _instance:_is_builtin_conf(name)
+
+    local builtin_configs = self._BUILTIN_CONFIGS
+    if not builtin_configs then
+        builtin_configs = {}
+        for apiname, _ in pairs(platform._interpreter():apis("platform")) do
+            local pos = apiname:find('_', 1, true)
+            if pos then
+                builtin_configs[apiname:sub(pos + 1)] = true
+            end
+        end
+        self._BUILTIN_CONFIGS = builtin_configs
+    end
+    return builtin_configs[name]
 end
 
 -- the interpreter
@@ -135,7 +158,18 @@ function platform._interpreter()
     assert(interp)
  
     -- define apis
-    interp:api_define
+    interp:api_define(platform._apis())
+
+    -- save interpreter
+    platform._INTERPRETER = interp
+
+    -- ok?
+    return interp
+end
+
+-- get platform apis
+function platform._apis()
+    return 
     {
         values =
         {
@@ -149,12 +183,10 @@ function platform._interpreter()
         {
             -- platform.on_xxx
             "platform.on_load"
-        ,   "platform.on_check"
-        }
-    ,   module =
-        {
-            -- platform.set_xxx
-            "platform.set_environment"
+        ,   "platform.on_config_check"
+        ,   "platform.on_global_check"
+        ,   "platform.on_environment_enter"
+        ,   "platform.on_environment_leave"
         }
     ,   dictionary =
         {
@@ -163,12 +195,32 @@ function platform._interpreter()
         ,   "platform.set_formats"
         }
     }
+end
 
-    -- save interpreter
-    platform._INTERPRETER = interp
+-- get platform directories
+function platform.directories()
 
-    -- ok?
-    return interp
+    -- init directories
+    local dirs = platform._DIRS or  {   path.join(global.directory(), "platforms")
+                                    ,   path.join(os.programdir(), "platforms")
+                                    }
+                                
+    -- save directories to cache
+    platform._DIRS = dirs
+    return dirs
+end
+
+-- add platform directories
+function platform.add_directories(...)
+
+    -- add directories
+    local dirs = platform.directories()
+    for _, dir in ipairs({...}) do
+        table.insert(dirs, 1, dir)
+    end
+
+    -- remove unique directories
+    platform._DIRS = table.unique(dirs)
 end
 
 -- load the given platform 
@@ -180,15 +232,18 @@ function platform.load(plat)
         return nil, string.format("unknown platform!")
     end
 
+    -- get cache key
+    local cachekey = plat .. "_" .. (config.get("arch") or os.arch())
+
     -- get it directly from cache dirst
     platform._PLATFORMS = platform._PLATFORMS or {}
-    if platform._PLATFORMS[plat] then
-        return platform._PLATFORMS[plat]
+    if platform._PLATFORMS[cachekey] then
+        return platform._PLATFORMS[cachekey]
     end
 
     -- find the platform script path
     local scriptpath = nil
-    for _, dir in ipairs(platform._directories()) do
+    for _, dir in ipairs(platform.directories()) do
 
         -- find this directory
         scriptpath = path.join(dir, plat, "xmake.lua")
@@ -209,14 +264,23 @@ function platform.load(plat)
         return nil, string.format("the platform %s not found!", plat)
     end
 
+    -- get interpreter
+    local interp = platform._interpreter()
+
+    -- load script
+    local ok, errors = interp:load(scriptpath)
+    if not ok then
+        return nil, errors
+    end
+
     -- load platform
-    local results, errors = platform._interpreter():load(scriptpath, "platform", true, false)
+    local results, errors = interp:make("platform", true, false)
     if not results and os.isfile(scriptpath) then
         return nil, errors
     end
 
     -- get result
-    local result = utils.ifelse(cross, results["cross"], results[plat])
+    local result = cross and results["cross"] or results[plat]
 
     -- check the platform name
     if not result then
@@ -224,23 +288,18 @@ function platform.load(plat)
     end
 
     -- new an instance
-    local instance, errors = _instance.new(plat, result, platform._interpreter():rootdir())
+    local instance, errors = _instance.new(plat, result, interp:rootdir())
     if not instance then
         return nil, errors
     end
 
     -- save instance to the cache
-    platform._PLATFORMS[plat] = instance
-
-    -- ok
+    platform._PLATFORMS[cachekey] = instance
     return instance
-
 end
 
--- get the given platform configure
+-- get the given platform configuration
 function platform.get(name, plat)
-
-    -- get the current platform configure
     local instance, errors = platform.load(plat)
     if instance then
         return instance:get(name)
@@ -259,11 +318,17 @@ function platform.tool(toolkind)
     local program = config.get(toolkind)
     local toolname = config.get("__toolname_" .. toolkind)
     if program == nil then 
+
+        -- get the current platform 
+        local instance, errors = platform.load()
+        if not instance then
+            os.raise(errors)
+        end
         
         -- check it first
-        local check = platform.get("check")
-        if check then
-            check("config", toolkind)
+        local on_check = instance:script("config_check")
+        if on_check then
+            on_check(instance, toolkind)
         end
 
         -- get it again
@@ -294,7 +359,7 @@ function platform.plats()
 
     -- get all platforms
     local plats = {}
-    local dirs  = platform._directories()
+    local dirs  = platform.directories()
     for _, dir in ipairs(dirs) do
 
         -- get the platform list 

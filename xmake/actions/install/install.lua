@@ -16,7 +16,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 -- 
--- Copyright (C) 2015 - 2018, TBOOX Open Source Group.
+-- Copyright (C) 2015 - 2019, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        install.lua
@@ -27,6 +27,22 @@ import("core.base.task")
 import("core.project.rule")
 import("core.project.project")
 
+-- install files
+function _install_files(target)
+
+    local srcfiles, dstfiles = target:installfiles()
+    if srcfiles and dstfiles then
+        local i = 1
+        for _, srcfile in ipairs(srcfiles) do
+            local dstfile = dstfiles[i]
+            if dstfile then
+                os.vcp(srcfile, dstfile)
+            end
+            i = i + 1
+        end
+    end
+end
+
 -- install binary
 function _install_binary(target)
 
@@ -36,13 +52,13 @@ function _install_binary(target)
     end
 
     -- the binary directory
-    local binarydir = path.join(_g.installdir, "bin")
+    local binarydir = path.join(target:installdir(), "bin")
 
     -- make the binary directory
     os.mkdir(binarydir)
 
     -- copy the target file
-    os.cp(target:targetfile(), binarydir)
+    os.vcp(target:targetfile(), binarydir)
 end
 
 -- install library
@@ -54,10 +70,10 @@ function _install_library(target)
     end
 
     -- the library directory
-    local librarydir = path.join(_g.installdir, "lib")
+    local librarydir = path.join(target:installdir(), "lib")
 
     -- the include directory
-    local includedir = path.join(_g.installdir, "include")
+    local includedir = path.join(target:installdir(), "include")
 
     -- make the library directory
     os.mkdir(librarydir)
@@ -66,7 +82,7 @@ function _install_library(target)
     os.mkdir(includedir)
 
     -- copy the target file
-    os.cp(target:targetfile(), librarydir)
+    os.vcp(target:targetfile(), librarydir)
 
     -- copy headers to the include directory
     local srcheaders, dstheaders = target:headerfiles(includedir)
@@ -75,7 +91,7 @@ function _install_library(target)
         for _, srcheader in ipairs(srcheaders) do
             local dstheader = dstheaders[i]
             if dstheader then
-                os.cp(srcheader, dstheader)
+                os.vcp(srcheader, dstheader)
             end
             i = i + 1
         end
@@ -94,10 +110,13 @@ function _do_install_target(target)
     }
 
     -- call script
-    local script = scripts[target:get("kind")]
+    local script = scripts[target:targetkind()]
     if script then
         script(target)
     end
+
+    -- install other files
+    _install_files(target)
 end
 
 -- on install target
@@ -107,6 +126,15 @@ function _on_install_target(target)
     if target:get("enabled") == false then
         return 
     end
+
+    -- get install directory
+    local installdir = target:installdir()
+    if not installdir then
+        return 
+    end
+
+    -- trace
+    print("installing %s to %s ...", target:name(), installdir)
 
     -- build target with rules
     local done = false
@@ -200,13 +228,10 @@ function _install_target_and_deps(target)
 end
 
 -- install targets
-function main(targetname, installdir)
+function main(targetname)
 
     -- init finished states
     _g.finished = {}
-
-    -- init install directory
-    _g.installdir = installdir
 
     -- install the given target?
     if targetname and not targetname:startswith("__") then

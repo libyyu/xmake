@@ -16,7 +16,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 -- 
--- Copyright (C) 2015 - 2018, TBOOX Open Source Group.
+-- Copyright (C) 2015 - 2019, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        run.lua
@@ -211,5 +211,5 @@ function main(program, argv)
     end
 
     -- no debugger
-    raise("debugger not found!")
+    raise("debugger%s not found!", debugger and ("(" .. debugger .. ")") or "")
 end

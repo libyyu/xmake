@@ -16,7 +16,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 -- 
--- Copyright (C) 2015 - 2018, TBOOX Open Source Group.
+-- Copyright (C) 2015 - 2019, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        xmake.lua
@@ -37,8 +37,8 @@ platform("android")
     -- set formats
     set_formats {static = "lib$(name).a", object = "$(name).o", shared = "lib$(name).so", symbol = "$(name).sym"}
 
-    -- on check
-    on_check("check")
+    -- on check project configuration
+    on_config_check("config")
 
     -- on load
     on_load("load")
@@ -54,7 +54,7 @@ platform("android")
 
             ,   global = 
                 {   
-                    {}
+                    {category = "Android NDK Configuration"                               }
                 ,   {nil, "ndk",            "kv", nil,          "The NDK Directory"       }
                 ,   {nil, "ndk_sdkver",     "kv", "auto",       "The SDK Version for NDK" }
                 }

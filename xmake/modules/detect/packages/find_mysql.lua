@@ -16,14 +16,14 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 -- 
--- Copyright (C) 2015 - 2018, TBOOX Open Source Group.
+-- Copyright (C) 2015 - 2019, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        find_mysql.lua
 --
 
 -- imports
-import("lib.detect.pkg_config")
+import("package.manager.find_package")
 
 -- find mysql 
 --
@@ -33,8 +33,13 @@ import("lib.detect.pkg_config")
 --
 function main(opt)
 
-    -- find package from the current host platform
-    if opt.plat == os.host() and opt.arch == os.arch() then
-        return pkg_config.find("mysqlclient")
+    -- find package by the builtin script
+    local result = opt.find_package("mysql", opt)
+
+    -- find package from the homebrew package manager
+    if not result and opt.plat == os.host() and opt.arch == os.arch() then
+        result = find_package("brew::mysqlclient", opt)
     end
+    return result
 end
+

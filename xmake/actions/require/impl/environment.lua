@@ -16,7 +16,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 -- 
--- Copyright (C) 2015 - 2018, TBOOX Open Source Group.
+-- Copyright (C) 2015 - 2019, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        environment.lua
@@ -40,9 +40,19 @@ function enter()
     -- set search pathes of toolchains 
     environment.enter("toolchains")
 
+    -- unzip is necessary
+    if not find_tool("unzip") then
+        raise("unzip not found! we need install it first")
+    end
+
     -- git not found? install it first
     if not find_tool("git") then
         package.install_packages("git")
+    end
+
+    -- missing the necessary unarchivers for *.gz, *.7z? install them first, e.g. gzip, 7z, tar ..
+    if not ((find_tool("gzip") and find_tool("tar")) or find_tool("7z")) then
+        package.install_packages("7z")
     end
 
     -- get prefix directories
@@ -50,10 +60,8 @@ function enter()
     local arch = get_config("arch")
     _g.prefixdirs = _g.prefixdirs or 
     {
-        core_package.prefixdir(false, false, plat, arch),
-        core_package.prefixdir(false, true, plat, arch),
-        core_package.prefixdir(true, false, plat, arch), 
-        core_package.prefixdir(true, true, plat, arch)
+        core_package.prefixdir(false, "release", plat, arch),
+        core_package.prefixdir(true, "release", plat, arch), 
     }
 
     -- add search directories of pkgconfig, aclocal, cmake 

@@ -16,7 +16,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 -- 
--- Copyright (C) 2015 - 2018, TBOOX Open Source Group.
+-- Copyright (C) 2015 - 2019, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        xmake.lua
@@ -135,7 +135,8 @@ task("config")
 
                 ,   {category = "Other Configuration"}
                 ,   {nil, "debugger",   "kv", "auto",       "The Debugger"                                                  }
-                ,   {nil, "ccache",     "kv", true,         "Enable or disable the c/c++ compiler cache."                   }
+                ,   {nil, "ccache",     "kv", true,         "Enable or disable the c/c++ compiler cache."         
+                                                    ,       "    --ccache=[y|n]"                                            }
                 ,   {'o', "buildir",    "kv", "build",      "Set the build directory."                                      }
 
                 ,   {}

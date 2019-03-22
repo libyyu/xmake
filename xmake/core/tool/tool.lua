@@ -16,7 +16,7 @@
 -- See the License for the specific tool governing permissions and
 -- limitations under the License.
 -- 
--- Copyright (C) 2015 - 2018, TBOOX Open Source Group.
+-- Copyright (C) 2015 - 2019, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        tool.lua
@@ -32,6 +32,7 @@ local path          = require("base/path")
 local utils         = require("base/utils")
 local table         = require("base/table")
 local string        = require("base/string")
+local config        = require("project/config")
 local sandbox       = require("sandbox/sandbox")
 local platform      = require("platform/platform")
 local import        = require("sandbox/modules/import")
@@ -109,13 +110,19 @@ function _instance:get(name)
 end
 
 -- has the given flag?
-function _instance:has_flags(flag)
+function _instance:has_flags(flags, flagkind)
 
     -- import has_flags()
     self._has_flags = self._has_flags or import("lib.detect.has_flags")
 
+    -- get system flags
+    local sysflags = self:get(self:kind() .. 'flags') 
+    if not sysflags and flagkind then
+        sysflags = self:get(flagkind)
+    end
+
     -- has flags?
-    return self._has_flags(self:name(), flag, {program = self:program(), toolkind = self:kind()})
+    return self._has_flags(self:name(), flags, {program = self:program(), toolkind = self:kind(), flagkind = flagkind, sysflags = sysflags})
 end
 
 -- load the given tool from the given kind
@@ -126,7 +133,7 @@ end
 function tool.load(kind, program)
 
     -- init key
-    local key = kind .. (program or "") 
+    local key = kind .. (program or "") .. (config.get("arch") or os.arch())
 
     -- get it directly from cache dirst
     tool._TOOLS = tool._TOOLS or {}

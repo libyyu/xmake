@@ -16,7 +16,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 -- 
--- Copyright (C) 2015 - 2018, TBOOX Open Source Group.
+-- Copyright (C) 2015 - 2019, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        list.lua
@@ -55,10 +55,10 @@ end
 function main()
 
     -- list all requires
-    print("The package dependencies:")
+    print("The package dependencies of project:")
 
     -- get requires 
-    local requires, requires_extra = project.get("requires"), project.get("__extra_requires")
+    local requires, requires_extra = project.requires_str()
     if not requires or #requires == 0 then
         return 
     end
@@ -71,11 +71,17 @@ function main()
         task.run("repo", {update = true})
     end
 
-    -- list all packages
+    -- list all required packages
     for _, instance in ipairs(package.load_packages(requires, {requires_extra = requires_extra})) do
         cprint("    ${magenta}require${clear}(%s): %s", instance:requireinfo().originstr, _info(instance))
         for _, dep in ipairs(instance:orderdeps()) do
             cprint("      -> ${magenta}dep${clear}(%s): %s", dep:requireinfo().originstr, _info(dep))
+        end
+        local fetchinfo = instance:fetch()
+        if fetchinfo then
+            for name, info in pairs(fetchinfo) do
+                cprint("      -> ${magenta}%s${clear}: %s", name, table.concat(table.wrap(info), " "))
+            end
         end
     end
 

@@ -16,7 +16,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 -- 
--- Copyright (C) 2015 - 2018, TBOOX Open Source Group.
+-- Copyright (C) 2015 - 2019, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        package.lua
@@ -26,7 +26,6 @@
 import("core.base.semver")
 import("core.base.option")
 import("core.base.global")
-import("core.project.cache")
 import("lib.detect.cache", {alias = "detectcache"})
 import("core.project.project")
 import("core.package.package", {alias = "core_package"})
@@ -44,6 +43,9 @@ import("repository")
 -- add_requires("xmake-repo@tbox >=1.5.1") 
 -- add_requires("aaa_bbb_ccc >=1.5.1 <1.6.0", {optional = true, alias = "mypkg", debug = true})
 -- add_requires("tbox", {config = {coroutine = true, abc = "xxx"}})
+-- add_requires("xmake::xmake-repo@tbox >=1.5.1") 
+-- add_requires("conan::OpenSSL/1.0.2n@conan/stable")
+-- add_requires("brew::pcre2/libpcre2-8 10.x", {alias = "pcre2"})
 --
 -- {system = nil/true/false}:
 --   nil: get local or system packages
@@ -82,19 +84,25 @@ function _parse_require(require_str, requires_extra, parentinfo)
     end
     assert(version, "require(\"%s\"): unknown version!", require_str)
 
-    -- get repository name, package name and package url
+    -- require third-party packages? e.g. brew::pcre2/libpcre2-8
     local reponame    = nil
     local packagename = nil
-    local pos = packageinfo:find_last('@', true)
-    if pos then
-
-        -- get package name
-        packagename = packageinfo:sub(pos + 1)
-
-        -- get reponame 
-        reponame = packageinfo:sub(1, pos - 1)
-    else 
+    if require_str:find("::", 1, true) then
         packagename = packageinfo
+    else
+
+        -- get repository name, package name and package url
+        local pos = packageinfo:find_last('@', true)
+        if pos then
+
+            -- get package name
+            packagename = packageinfo:sub(pos + 1)
+
+            -- get reponame 
+            reponame = packageinfo:sub(1, pos - 1)
+        else 
+            packagename = packageinfo
+        end
     end
 
     -- check package name
@@ -332,11 +340,25 @@ function _get_confirm(packages)
     -- get confirm
     local confirm = option.get("yes")
     if confirm == nil then
-    
-        -- show tips
-        cprint("${bright yellow}note: ${default yellow}try installing these packages (pass -y to skip confirm)?")
+
+        -- get packages for each repositories
+        local packages_repo = {}
         for _, package in ipairs(packages) do
-            print("  -> %s %s %s", package:name(), package:version_str() or "", package:debug() and "(debug)" or "")
+            local reponame = package:repo() and package:repo():name() or package:fromkind()
+            if package:is3rd() then
+                reponame = package:name():lower():split("::")[1]
+            end
+            packages_repo[reponame] = packages_repo[reponame] or {}
+            table.insert(packages_repo[reponame], package)
+        end
+
+        -- show tips
+        cprint("${bright color.warning}note: ${clear}try installing these packages (pass -y to skip confirm)?")
+        for reponame, packages in pairs(packages_repo) do
+            print("in %s:", reponame)
+            for _, package in ipairs(packages) do
+                print("  -> %s %s %s", package:name(), package:version_str() or "", package:debug() and "(debug)" or "")
+            end
         end
         cprint("please input: y (y/n)")
 
@@ -447,7 +469,7 @@ function install_packages(requires, opt)
     -- exists unsupported packages?
     if #packages_unsupported > 0 then
         -- show tips
-        cprint("${bright red}note: ${default red}the following packages are unsupported for $(plat)/$(arch)!")
+        cprint("${bright color.warning}note: ${clear}the following packages are unsupported for $(plat)/$(arch)!")
         for _, package in ipairs(packages_unsupported) do
             print("  -> %s %s", package:name(), package:version_str() or "")
         end
@@ -472,10 +494,10 @@ function install_packages(requires, opt)
             action.download(package)
         end
 
-    end, #packages_download, ifelse(option.get("verbose"), 1, 4), 300, function (indices) 
+    end, #packages_download, ifelse((option.get("verbose") or option.get("diagnosis")), 1, 4), 300, function (indices) 
 
         -- do not print progress info if be verbose 
-        if option.get("verbose") then
+        if option.get("verbose") or option.get("diagnosis") then
             return 
         end
  

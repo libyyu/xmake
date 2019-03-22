@@ -16,7 +16,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 -- 
--- Copyright (C) 2015 - 2018, TBOOX Open Source Group.
+-- Copyright (C) 2015 - 2019, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        xmake.lua
@@ -37,8 +37,11 @@ platform("iphoneos")
     -- set formats
     set_formats {static = "lib$(name).a", object = "$(name).o", shared = "lib$(name).dylib", symbol = "$(name).sym"}
 
-    -- on check
-    on_check("check")
+    -- on check project configuration
+    on_config_check("config")
+
+    -- on check global configuration
+    on_global_check("global")
 
     -- on load
     on_load("load")
@@ -51,20 +54,12 @@ platform("iphoneos")
                 ,   {nil, "xcode",          "kv", "auto",       "The Xcode Application Directory"   }
                 ,   {nil, "xcode_sdkver",   "kv", "auto",       "The SDK Version for Xcode"         }
                 ,   {nil, "target_minver",  "kv", "auto",       "The Target Minimal Version"        }
-                ,   {}
-                ,   {nil, "mobileprovision","kv", "auto",       "The Provisioning Profile File"     }
-                ,   {nil, "codesign",       "kv", "auto",       "The Code Signing Indentity"        }
-                ,   {nil, "entitlements",   "kv", "auto",       "The Code Signing Entitlements"     }
                 }
 
             ,   global = 
                 {   
-                    {}
+                    {category = "XCode SDK Configuration"                                           }
                 ,   {nil, "xcode",          "kv", "auto",       "The Xcode Application Directory"   }
-                ,   {}
-                ,   {nil, "mobileprovision","kv", "auto",       "The Provisioning Profile File"     }
-                ,   {nil, "codesign",       "kv", "auto",       "The Code Signing Indentity"        }
-                ,   {nil, "entitlements",   "kv", "auto",       "The Code Signing Entitlements"     }
                 }
             }
 

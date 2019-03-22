@@ -16,7 +16,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 -- 
--- Copyright (C) 2015 - 2018, TBOOX Open Source Group.
+-- Copyright (C) 2015 - 2019, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        deprecated_interpreter.lua
@@ -138,54 +138,6 @@ function deprecated_interpreter:api_register_set_script(scope_kind, ...)
 
     -- register implementation
     self:_api_register_xxx_values(scope_kind, "set", implementation, ...)
-end
-
--- register api: set_xxx_xxx
-function deprecated_interpreter:_api_register_set_xxx_xxx(scope_kind, apiname)
-
-    -- the old api
-    local oldapi = string.format("set_%s_%s", scope_kind, apiname)
-
-    -- the new api
-    local newapi = string.format("set_%s", apiname)
-
-    -- get api function
-    local apifunc = self:_api_within_scope(scope_kind, newapi)
-    assert(apifunc)
-
-    -- register api
-    self:api_register_builtin(oldapi, function (value, ...) 
-
-                                        -- deprecated
-                                        deprecated.add(newapi .. "(\"%s\")", oldapi .. "(\"%s\")", tostring(value))
-                                      
-                                        -- dispatch it
-                                        apifunc(value, ...)
-                                    end)
-end
-
--- register api: add_xxx_xxx
-function deprecated_interpreter:_api_register_add_xxx_xxx(scope_kind, apiname)
-
-    -- the old api
-    local oldapi = string.format("add_%s_%s", scope_kind, apiname)
-
-    -- the new api
-    local newapi = string.format("add_%s", apiname)
-
-    -- get api function
-    local apifunc = self:_api_within_scope(scope_kind, newapi)
-    assert(apifunc)
-
-    -- register api
-    self:api_register_builtin(oldapi, function (value, ...) 
-
-                                        -- deprecated
-                                        deprecated.add(newapi .. "(\"%s\")", oldapi .. "(\"%s\")", tostring(value))
-                                      
-                                        -- dispatch it
-                                        apifunc(value, ...)
-                                    end)
 end
 
 -- return module: deprecated_interpreter

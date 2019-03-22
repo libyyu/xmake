@@ -16,7 +16,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 -- 
--- Copyright (C) 2015 - 2018, TBOOX Open Source Group.
+-- Copyright (C) 2015 - 2019, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        vs201x_vcxproj.lua
@@ -38,6 +38,7 @@ function _get_toolset_ver(targetinfo, vsinfo)
     ,   vs2013 = "v120"
     ,   vs2015 = "v140"
     ,   vs2017 = "v141"
+    ,   vs2019 = "v142"
     }
 
     -- get toolset version from vs version
@@ -53,7 +54,7 @@ function _get_toolset_ver(targetinfo, vsinfo)
 
     -- for xp?
     for _, flag in ipairs(targetinfo.linkflags) do
-        if flag:lower():find("[%-/]subsystem:.-,5.01$") then
+        if flag:lower():find("^[%-/]subsystem:.-,5%.%d+$") then
             toolset_ver = toolset_ver .. "_xp"
             break
         end
@@ -71,6 +72,7 @@ function _get_platform_sdkver(target, vsinfo)
     {
         vs2015 = "10.0.10240.0"
     ,   vs2017 = "10.0.14393.0"
+    ,   vs2019 = "10.0.17763.0"
     }
 
     -- get sdk version for vcvarsall[arch].WindowsSDKVersion
@@ -84,6 +86,25 @@ function _get_platform_sdkver(target, vsinfo)
 
     -- done
     return sdkver or sdkvers["vs" .. vsinfo.vstudio_version]
+end
+
+-- make compiling command
+function _make_compcmd(compargv, sourcefile, objectfile, vcxprojdir)
+    local argv = {}
+    for _, v in ipairs(compargv) do
+        v = v:gsub("__sourcefile__", sourcefile)
+        v = v:gsub("__objectfile__", objectfile)
+        -- -Idir or /Idir
+        v = v:gsub("([%-/]I)(.*)", function (I, dir)
+                dir = path.translate(dir:trim())
+                if not path.is_absolute(dir) then
+                    dir = path.relative(path.absolute(dir), vcxprojdir)
+                end
+                return I .. dir
+            end)
+        table.insert(argv, v)
+    end
+    return table.concat(argv, " ")
 end
 
 -- make compiling flags
@@ -122,12 +143,21 @@ function _make_linkflags(targetinfo, vcxprojdir)
     for _, flag in ipairs(targetinfo.linkflags) do
 
         -- replace -libpath:dir or /libpath:dir
-        flag = flag:gsub("[%-/]libpath:(.*)", function (dir)
+        flag = flag:gsub(string.ipattern("[%-/]libpath:(.*)"), function (dir)
                         dir = path.translate(dir:trim())
                         if not path.is_absolute(dir) then
                             dir = path.relative(path.absolute(dir), vcxprojdir)
                         end
                         return "/libpath:" .. dir
+                    end)
+
+        -- replace -def:dir or /def:dir
+        flag = flag:gsub(string.ipattern("[%-/]def:(.*)"), function (dir)
+                        dir = path.translate(dir:trim())
+                        if not path.is_absolute(dir) then
+                            dir = path.relative(path.absolute(dir), vcxprojdir)
+                        end
+                        return "/def:" .. dir
                     end)
 
         -- save flag
@@ -149,6 +179,7 @@ function _make_header(vcxprojfile, vsinfo)
     ,   vs2013 = '12'
     ,   vs2015 = '14'
     ,   vs2017 = '15'
+    ,   vs2019 = '16'
     }
 
     -- make header
@@ -288,6 +319,18 @@ function _make_source_options(vcxprojfile, flags, condition)
     if flagstr:find("[%-/]WX") then
         vcxprojfile:print("<TreatWarningAsError%s>true</TreatWarningAsError>", condition) 
     end
+    
+    -- make PreprocessorDefinitions
+    local defstr = ""
+    for _, flag in ipairs(flags) do
+        flag:gsub("[%-/]D(.*)",
+            function (def) 
+                defstr = defstr .. def .. ";"
+            end
+        )
+    end
+    defstr = defstr .. "%%(PreprocessorDefinitions)"
+    vcxprojfile:print("<PreprocessorDefinitions%s>%s</PreprocessorDefinitions>", condition, defstr) 
 
     -- make DebugInformationFormat
     if flagstr:find("[%-/]Zi") then
@@ -329,7 +372,7 @@ function _make_source_options(vcxprojfile, flags, condition)
 
     -- make AdditionalOptions
     local additional_flags = {}
-    local excludes = {"Os", "O0", "O1", "O2", "Ot", "Ox", "W0", "W1", "W2", "W3", "WX", "Wall", "Zi", "ZI", "Z7", "MT", "MTd", "MD", "MDd", "TP", "Fd", "fp", "I"}
+    local excludes = {"Od", "Os", "O0", "O1", "O2", "Ot", "Ox", "W0", "W1", "W2", "W3", "WX", "Wall", "Zi", "ZI", "Z7", "MT", "MTd", "MD", "MDd", "TP", "Fd", "fp", "I", "D"}
     for _, flag in ipairs(flags) do
         local excluded = false
         for _, exclude in ipairs(excludes) do
@@ -528,15 +571,17 @@ function _make_source_file_forall(vcxprojfile, vsinfo, target, sourcefile, sourc
             vcxprojfile:print("<FileType>Document</FileType>")
             for _, info in ipairs(sourceinfo) do
                 local objectfile = path.relative(path.absolute(info.objectfile), vcxprojdir)
+                local compcmd = _make_compcmd(info.compargv, sourcefile, objectfile, vcxprojdir)
                 vcxprojfile:print("<Outputs Condition=\"\'%$(Configuration)|%$(Platform)\'==\'%s\'\">%s</Outputs>", info.mode .. '|' .. info.arch, objectfile)
-                vcxprojfile:print("<Command Condition=\"\'%$(Configuration)|%$(Platform)\'==\'%s\'\">%s /nologo /c %s -Fo%s %s</Command>", info.mode .. '|' .. info.arch, ifelse(info.arch == "x64", "ml64", "ml"), os.args(info.flags), objectfile, sourcefile)
+                vcxprojfile:print("<Command Condition=\"\'%$(Configuration)|%$(Platform)\'==\'%s\'\">%s</Command>", info.mode .. '|' .. info.arch, compcmd)
             end
+            vcxprojfile:print("<Message>%s</Message>", path.filename(sourcefile))
 
         -- for *.rc files
         elseif sourcekind == "mrc" then
             for _, info in ipairs(sourceinfo) do
                 local objectfile = path.relative(path.absolute(info.objectfile), vcxprojdir)
-                vcxprojfile:print("<ResourceOutputFileName Condition=\"\'%$(Configuration)|%$(Platform)\'==\'%s|%s\'\">%s</ResourceOutputFileName>",info.mode,info.arch,objectfile)
+                vcxprojfile:print("<ResourceOutputFileName Condition=\"\'%$(Configuration)|%$(Platform)\'==\'%s|%s\'\">%s</ResourceOutputFileName>", info.mode, info.arch, objectfile)
             end
 
         -- for *.c/cpp files
@@ -640,10 +685,11 @@ function _make_source_file_forspec(vcxprojfile, vsinfo, target, sourcefile, sour
         -- for *.asm files
         local objectfile = path.relative(path.absolute(info.objectfile), vcxprojdir)
         if info.sourcekind == "as" then 
+            local compcmd = _make_compcmd(info.compargv, sourcefile, objectfile, vcxprojdir)
             vcxprojfile:print("<ExcludedFromBuild>false</ExcludedFromBuild>")
             vcxprojfile:print("<FileType>Document</FileType>")
             vcxprojfile:print("<Outputs>%s</Outputs>", objectfile)
-            vcxprojfile:print("<Command>%s /nologo /c %s -Fo%s %s</Command>", ifelse(info.arch == "x64", "ml64", "ml"), os.args(info.flags), objectfile, sourcefile)
+            vcxprojfile:print("<Command>%s</Command>", compcmd)
 
         -- for *.rc files
         elseif sourcekind == "mrc" then
@@ -710,7 +756,7 @@ function _make_source_files(vcxprojfile, vsinfo, target, vcxprojdir)
                         local objectfile    = objectfiles[idx]
                         local flags         = targetinfo.sourceflags[sourcefile]
                         sourceinfos[sourcefile] = sourceinfos[sourcefile] or {}
-                        table.insert(sourceinfos[sourcefile], {mode = targetinfo.mode, arch = targetinfo.arch, sourcekind = sourcekind, objectfile = objectfile, flags = flags})
+                        table.insert(sourceinfos[sourcefile], {mode = targetinfo.mode, arch = targetinfo.arch, sourcekind = sourcekind, objectfile = objectfile, flags = flags, compargv = targetinfo.compargvs[sourcefile]})
                     end
                 end
             end

@@ -16,7 +16,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 -- 
--- Copyright (C) 2015 - 2018, TBOOX Open Source Group.
+-- Copyright (C) 2015 - 2019, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        deprecated_project.lua
@@ -101,21 +101,130 @@ function deprecated_project._api_add_packages(interp, ...)
     return deprecated_project._api_add_pkgs(interp, ...)
 end
 
--- set_enable for option
-function deprecated_project._api_option_set_enable(interp, ...)
+-- set modes
+function deprecated_project._api_set_modes(interp, ...)
 
     -- get api function
-    local apifunc = interp:_api_within_scope("option", "set_default")
+    local apifunc = interp:api_func("set_modes")
     assert(apifunc)
 
     -- register api
-    interp:api_register_builtin("set_enable", function (value) 
+    interp:api_register_builtin("set_modes", function (...) 
 
                                             -- deprecated
-                                            deprecated.add("set_default(%s)", "set_enable(%s)", tostring(value))
+                                            deprecated.add("add_rules(\"mode.debug\", \"mode.release\")", "set_modes(\"debug\", \"release\")")
+
+                                            -- dispatch it
+                                            apifunc(...)
+                                        end)
+end
+
+-- add_csnippet/add_cxxsnippet for option
+function deprecated_project._api_option_add_cxsnippet(interp, apiname)
+
+    -- get api function
+    local apifunc = interp:_api_within_scope("option", apiname)
+    assert(apifunc)
+
+    -- register api
+    interp:_api_within_scope_set("option", apiname, function (...) 
+
+                                            -- deprecated
+                                            deprecated.add(apiname .. "s(...)", apiname .. "(...)")
                                           
                                             -- dispatch it
-                                            apifunc(value)
+                                            apifunc(...)
+                                        end)
+end
+
+-- add_headers for target
+function deprecated_project._api_target_add_headers(interp)
+
+    -- get api function
+    local apifunc = interp:_api_within_scope("target", "add_headers")
+    assert(apifunc)
+
+    -- register api
+    interp:_api_within_scope_set("target", "add_headers", function (value, ...) 
+
+                                            -- deprecated
+                                            deprecated.add("add_headerfiles(%s)", "add_headers(%s)", tostring(value))
+
+                                            -- dispatch it
+                                            apifunc(value, ...)
+                                        end)
+end
+
+
+-- add_defines_h for target
+function deprecated_project._api_target_add_defines_h(interp)
+
+    -- get api function
+    local apifunc = interp:_api_within_scope("target", "add_defines_h")
+    assert(apifunc)
+
+    -- register api
+    interp:_api_within_scope_set("target", "add_defines_h", function (value, ...) 
+
+                                            -- deprecated
+                                            deprecated.add("add_configfiles() and set_configvar(%s)", "add_defines_h(%s)", tostring(value))
+
+                                            -- dispatch it
+                                            apifunc(value, ...)
+                                        end)
+end
+
+-- add_defines_h for option
+function deprecated_project._api_option_add_defines_h(interp)
+
+    -- get api function
+    local apifunc = interp:_api_within_scope("option", "add_defines_h")
+    assert(apifunc)
+
+    -- register api
+    interp:_api_within_scope_set("option", "add_defines_h", function (value, ...) 
+
+                                            -- deprecated
+                                            deprecated.add("add_configfiles() and set_configvar(%s)", "add_defines_h(%s)", tostring(value))
+
+                                            -- dispatch it
+                                            apifunc(value, ...)
+                                        end)
+end
+
+-- set_config_header for target
+function deprecated_project._api_target_set_config_header(interp)
+
+    -- get api function
+    local apifunc = interp:_api_within_scope("target", "set_config_header")
+    assert(apifunc)
+
+    -- register api
+    interp:_api_within_scope_set("target", "set_config_header", function (value, ...) 
+
+                                            -- deprecated
+                                            deprecated.add("add_configfiles(%s.in)", "set_config_header(%s)", tostring(value))
+
+                                            -- dispatch it
+                                            apifunc(value, ...)
+                                        end)
+end
+
+-- set_headerdir for target
+function deprecated_project._api_target_set_headerdir(interp)
+
+    -- get api function
+    local apifunc = interp:_api_within_scope("target", "set_headerdir")
+    assert(apifunc)
+
+    -- register api
+    interp:_api_within_scope_set("target", "set_headerdir", function (value, ...) 
+
+                                            -- deprecated
+                                            deprecated.add(false, "set_headerdir(%s)", tostring(value))
+                                          
+                                            -- dispatch it
+                                            apifunc(value, ...)
                                         end)
 end
 
@@ -153,44 +262,23 @@ function deprecated_project.api_register(interp)
     -- register api: is_option() to root
     interp:api_register(nil, "is_option",   deprecated_project._api_is_option)
 
-    -- register api: set_enable() to option
-    interp:api_register("option", "set_enable", deprecated_project._api_option_set_enable)
+    -- register api: set_modes() to root
+    deprecated_project._api_set_modes(interp)
 
-    -- register api: set_values() to option
-    deprecated_interpreter._api_register_set_xxx_xxx(interp, "option", "enable")
-    deprecated_interpreter._api_register_set_xxx_xxx(interp, "option", "showmenu")
-    deprecated_interpreter._api_register_set_xxx_xxx(interp, "option", "category")
-    deprecated_interpreter._api_register_set_xxx_xxx(interp, "option", "warnings")
-    deprecated_interpreter._api_register_set_xxx_xxx(interp, "option", "optimize")
-    deprecated_interpreter._api_register_set_xxx_xxx(interp, "option", "languages")
-    deprecated_interpreter._api_register_set_xxx_xxx(interp, "option", "description")
+    -- register api: add_csnippet/add_cxxsnippet() to option
+    deprecated_project._api_option_add_cxsnippet(interp, "add_csnippet")
+    deprecated_project._api_option_add_cxsnippet(interp, "add_cxxsnippet")
 
-    -- register api: add_values() to option
-    deprecated_interpreter._api_register_add_xxx_xxx(interp, "option", "links")
-    deprecated_interpreter._api_register_add_xxx_xxx(interp, "option", "cincludes")
-    deprecated_interpreter._api_register_add_xxx_xxx(interp, "option", "cxxincludes")
-    deprecated_interpreter._api_register_add_xxx_xxx(interp, "option", "cfuncs")
-    deprecated_interpreter._api_register_add_xxx_xxx(interp, "option", "cxxfuncs")
-    deprecated_interpreter._api_register_add_xxx_xxx(interp, "option", "ctypes")
-    deprecated_interpreter._api_register_add_xxx_xxx(interp, "option", "cxxtypes")
-    deprecated_interpreter._api_register_add_xxx_xxx(interp, "option", "cflags")
-    deprecated_interpreter._api_register_add_xxx_xxx(interp, "option", "cxflags")
-    deprecated_interpreter._api_register_add_xxx_xxx(interp, "option", "cxxflags")
-    deprecated_interpreter._api_register_add_xxx_xxx(interp, "option", "mflags")
-    deprecated_interpreter._api_register_add_xxx_xxx(interp, "option", "mxflags")
-    deprecated_interpreter._api_register_add_xxx_xxx(interp, "option", "mxxflags")
-    deprecated_interpreter._api_register_add_xxx_xxx(interp, "option", "ldflags")
-    deprecated_interpreter._api_register_add_xxx_xxx(interp, "option", "vectorexts")
-    deprecated_interpreter._api_register_add_xxx_xxx(interp, "option", "defines")
-    deprecated_interpreter._api_register_add_xxx_xxx(interp, "option", "defines_if_ok")
-    deprecated_interpreter._api_register_add_xxx_xxx(interp, "option", "defines_h_if_ok")
-    deprecated_interpreter._api_register_add_xxx_xxx(interp, "option", "undefines")
-    deprecated_interpreter._api_register_add_xxx_xxx(interp, "option", "undefines_if_ok")
-    deprecated_interpreter._api_register_add_xxx_xxx(interp, "option", "undefines_h_if_ok")
+    -- register api: add_headers() to target
+    deprecated_project._api_target_add_headers(interp)
 
-    -- register api: add_pathes() to option
-    deprecated_interpreter._api_register_add_xxx_xxx(interp, "option", "linkdirs")
-    deprecated_interpreter._api_register_add_xxx_xxx(interp, "option", "includedirs")
+    -- register api: add_defines_h()/set_config_header() to option/target
+    deprecated_project._api_option_add_defines_h(interp)
+    deprecated_project._api_target_add_defines_h(interp)
+    deprecated_project._api_target_set_config_header(interp)
+
+    -- register api: set_headerdir() to target
+    deprecated_project._api_target_set_headerdir(interp)
 end
 
 -- return module: deprecated_project

@@ -16,7 +16,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 -- 
--- Copyright (C) 2015 - 2018, TBOOX Open Source Group.
+-- Copyright (C) 2015 - 2019, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        vs201x.lua
@@ -74,23 +74,25 @@ function _make_targetinfo(mode, arch, target)
     -- save object dir
     targetinfo.objectdir = target:objectdir()
 
-    -- save compiler flags
-    local firstcompflags=nil
+    -- save compiler flags and cmds
+    local firstcompflags = nil
     targetinfo.compflags = {}
+    targetinfo.compargvs = {}
     for sourcekind, sourcebatch in pairs(target:sourcebatches()) do
         if not sourcebatch.rulename then
-            for _, sourcefile in ipairs(sourcebatch.sourcefiles) do
+            for idx, sourcefile in ipairs(sourcebatch.sourcefiles) do
                 local compflags = compiler.compflags(sourcefile, {target = target})
                 if not firstcompflags and (sourcekind == "cc" or sourcekind == "cxx") then
                     firstcompflags = compflags
                 end
                 targetinfo.compflags[sourcefile] = compflags
+                targetinfo.compargvs[sourcefile] = table.join(compiler.compargv("__sourcefile__", "__objectfile__", {sourcekind = sourcekind, target = target}))
             end
         end
     end
 
     -- save linker flags
-    local linkflags = linker.linkflags(target:get("kind"), target:sourcekinds(), {target = target})
+    local linkflags = linker.linkflags(target:targetkind(), target:sourcekinds(), {target = target})
     targetinfo.linkflags = linkflags
 
     -- use mfc? save the mfc runtime kind
@@ -116,11 +118,11 @@ end
 function _make_targetheaders(mode, arch, target, last)
 
     -- only for static and shared target
-    local kind = target:get("kind")
+    local kind = target:targetkind()
     if kind == "static" or kind == "shared" then
 
-        -- make headers
-        local srcheaders, dstheaders = target:headerfiles()
+        -- TODO make headers, (deprecated)
+        local srcheaders, dstheaders = target:headers()
         if srcheaders and dstheaders then
             local i = 1
             for _, srcheader in ipairs(srcheaders) do
@@ -163,6 +165,38 @@ function _make_targetheaders(mode, arch, target, last)
     end
 end
 
+function _make_vsinfo_modes()
+    local vsinfo_modes = {}
+    local modes = option.get("modes")
+    if modes then
+        for _, mode in ipairs(modes:split(',')) do
+            table.insert(vsinfo_modes, mode:trim())
+        end
+    else
+        vsinfo_modes = project.modes()
+    end
+    if not vsinfo_modes or #vsinfo_modes == 0 then
+        vsinfo_modes = { config.mode() }
+    end
+    return vsinfo_modes
+end
+
+function _make_vsinfo_archs()
+    local vsinfo_archs = {}
+    local archs = option.get("archs")
+    if archs then
+        for _, arch in ipairs(archs:split(',')) do
+            table.insert(vsinfo_archs, arch:trim())
+        end
+    else
+        vsinfo_archs = platform.archs()
+    end
+    if not vsinfo_archs or #vsinfo_archs == 0 then
+        vsinfo_archs = { config.arch() }
+    end
+    return vsinfo_archs
+end
+
 -- make vstudio project
 function make(outputdir, vsinfo)
 
@@ -173,23 +207,15 @@ function make(outputdir, vsinfo)
     vsinfo.solution_dir = path.join(outputdir, "vs" .. vsinfo.vstudio_version)
 
     -- init modes
-    local modes = option.get("modes")
-    if modes then
-        vsinfo.modes = {}
-        for _, mode in ipairs(modes:split(',')) do
-            table.insert(vsinfo.modes, mode:trim())
-        end
-    else
-        vsinfo.modes = project.modes()
-    end
-    if not vsinfo.modes or #vsinfo.modes == 0 then
-        vsinfo.modes = { config.mode() }
-    end
+    vsinfo.modes = _make_vsinfo_modes()
+    
+    -- init archs
+    vsinfo.archs = _make_vsinfo_archs()
 
     -- load targets
     local targets = {}
     for mode_idx, mode in ipairs(vsinfo.modes) do
-        for arch_idx, arch in ipairs({"x86", "x64"}) do
+        for arch_idx, arch in ipairs(vsinfo.archs) do
 
             -- trace
             print("checking for the %s.%s ...", mode, arch)
@@ -198,6 +224,7 @@ function make(outputdir, vsinfo)
             if mode ~= config.mode() or arch ~= config.arch() then
                 
                 -- modify config
+                config.set("as", nil, {force = true}) -- force to re-check as for ml/ml64
                 config.set("mode", mode, {readonly = true, force = true})
                 config.set("arch", arch, {readonly = true, force = true})
 
@@ -234,7 +261,7 @@ function make(outputdir, vsinfo)
 
                     -- init target info
                     _target.name = targetname
-                    _target.kind = target:get("kind")
+                    _target.kind = target:targetkind()
                     _target.scriptdir = target:scriptdir()
                     _target.info = _target.info or {}
                     table.insert(_target.info, _make_targetinfo(mode, arch, target))

@@ -16,7 +16,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 -- 
--- Copyright (C) 2015 - 2018, TBOOX Open Source Group.
+-- Copyright (C) 2015 - 2019, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        config.lua
@@ -146,8 +146,6 @@ function config.buildir()
         -- adjust path for the current directory
         buildir = path.relative(buildir, os.curdir())
     end
-
-    -- ok?
     return buildir
 end
 
@@ -282,7 +280,14 @@ end
 -- dump the configure
 function config.dump()
     if not option.get("quiet") then
-        table.dump(config.options(), "__%w*", "configure")
+        utils.print("configure")
+        utils.print("{")
+        for name, value in pairs(config.options()) do
+            if not name:startswith("__") then
+                utils.print("    %s = %s", name, value)
+            end
+        end
+        utils.print("}")
     end
 end
 

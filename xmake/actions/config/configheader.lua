@@ -16,7 +16,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 -- 
--- Copyright (C) 2015 - 2018, TBOOX Open Source Group.
+-- Copyright (C) 2015 - 2019, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        configheader.lua
@@ -48,8 +48,14 @@ function _make_for_target(target)
 
     -- make version
     local version, version_build = target:configversion()
-    if not version then 
-        version, version_build = project.version()
+    if not version or not version_build then 
+        local target_version, target_version_build = target:version()
+        if not version then
+            version = target_version
+        end
+        if not version_build then
+            version_build = target_version_build
+        end
     end
     if version then
         file:print("// version")
@@ -74,7 +80,7 @@ function _make_for_target(target)
     local undefines = table.copy(target:get("undefines_h")) 
 
     -- make the defines for options
-    for _, opt in ipairs(target:options()) do
+    for _, opt in ipairs(target:orderopts()) do
         table.join2(defines, opt:get("defines_h")) 
         table.join2(defines, opt:get("defines_h_if_ok")) -- deprecated 
         table.join2(undefines, opt:get("undefines_h")) 
@@ -82,7 +88,7 @@ function _make_for_target(target)
     end
 
     -- make the defines for packages
-    for _, pkg in ipairs(target:packages()) do
+    for _, pkg in ipairs(target:orderpkgs()) do
         table.join2(defines, pkg:get("defines_h")) 
         table.join2(undefines, pkg:get("undefines_h")) 
     end

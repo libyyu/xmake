@@ -16,7 +16,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 -- 
--- Copyright (C) 2015 - 2018, TBOOX Open Source Group.
+-- Copyright (C) 2015 - 2019, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        interpreter.lua
@@ -31,12 +31,13 @@ local path      = require("base/path")
 local table     = require("base/table")
 local utils     = require("base/utils")
 local string    = require("base/string")
+local scopeinfo = require("base/scopeinfo")
 local sandbox   = require("sandbox/sandbox")
 
 -- traceback
 function interpreter._traceback(errors)
 
-    -- not verbose?
+    -- disable backtrace?
     if errors then
         local _, pos = errors:find("[nobacktrace]: ", 1, true)
         if pos then
@@ -347,30 +348,15 @@ end
 
 -- translate api pathes 
 function interpreter:_api_translate_pathes(values)
-
-    -- check
-    assert(self and self._PRIVATE)
-
-    -- the current file 
-    local curfile = self._PRIVATE._CURFILE
-    assert(curfile)
-
-    -- the current directory
-    local curdir = path.directory(curfile)
-    assert(curdir)
-
-    -- translate the relative path 
     local results = {}
     for _, p in ipairs(values) do
         assert(type(p) == "string", "invalid path value: " .. tostring(p))
         if not p:find("^%s-%$%(.-%)") and not path.is_absolute(p) then
-            table.insert(results, path.relative(path.absolute(p, curdir), self._PRIVATE._ROOTDIR))
+            table.insert(results, path.relative(path.absolute(p, self:scriptdir()), self:rootdir()))
         else
             table.insert(results, p)
         end
     end
-
-    -- ok?
     return results
 end
 
@@ -396,6 +382,28 @@ function interpreter:_api_within_scope(scope_kind, apiname)
     end
 end
 
+-- set api function within scope
+function interpreter:_api_within_scope_set(scope_kind, apiname, apifunc)
+
+    -- the private
+    local priv = self._PRIVATE
+    assert(priv)
+
+    -- the scopes
+    local scopes = priv._SCOPES
+    assert(scopes)
+
+    -- get scope api
+    if scope_kind and priv._APIS then
+
+        -- get api function
+        local api_scope = priv._APIS[scope_kind]
+        if api_scope then
+            api_scope[apiname] = apifunc
+        end
+    end
+end
+
 -- clear results
 function interpreter:_clear()
 
@@ -411,7 +419,7 @@ end
 function interpreter:_filter(values)
 
     -- check
-    assert(self and values)
+    assert(self and values ~= nil)
 
     -- return values directly if no filter
     local filter = self._PRIVATE._FILTER
@@ -463,7 +471,7 @@ function interpreter:_filter(values)
     return results
 end
 
--- handle scope
+-- handle scope data
 function interpreter:_handle(scope, remove_repeat, enable_filter)
 
     -- check
@@ -489,8 +497,6 @@ function interpreter:_handle(scope, remove_repeat, enable_filter)
         -- update it
         results[name] = values
     end
-
-    -- ok?
     return results
 end
 
@@ -508,50 +514,62 @@ function interpreter:_make(scope_kind, remove_repeat, enable_filter)
         os.raise("the scope %s() is empty!", scope_kind)
     end
 
-    -- make results
+    -- get the root scope info of the given scope kind, e.g. root.target
     local results = {}
-    if scope_kind then
+    local scope_opt = {interpreter = self, remove_repeat = remove_repeat, enable_filter = enable_filter}
+    if scope_kind and scope_kind:startswith("root.") then
+
+        local root_scope = scopes._ROOT[scope_kind:sub(6)]
+        if root_scope then
+            results = self:_handle(root_scope, remove_repeat, enable_filter)
+        end
+        return scopeinfo.new(scope_kind, results, scope_opt)
+
+    -- get the root scope info without scope kind
+    elseif scope_kind == "root" or scope_kind == nil then
+
+        local root_scope = scopes._ROOT["__rootkind"]
+        if root_scope then
+            results = self:_handle(root_scope, remove_repeat, enable_filter)
+        end
+        return scopeinfo.new(scope_kind, results, scope_opt)
+
+    -- get the results of the given scope kind
+    elseif scope_kind then
 
         -- not this scope for kind?
         local scope_for_kind = scopes[scope_kind]
-        if not scope_for_kind then
-            return {}
-        end
+        if scope_for_kind then
 
-        -- fetch the root values in root scope first 
-        interpreter._fetch_root_scope(scopes._ROOT)
+            -- fetch the root values in root scope first 
+            interpreter._fetch_root_scope(scopes._ROOT)
 
-        -- merge results
-        for scope_name, scope in pairs(scope_for_kind) do
+            -- merge results
+            for scope_name, scope in pairs(scope_for_kind) do
 
-            -- add scope values
-            local scope_values = {}
-            for name, values in pairs(scope) do
-                if not name:startswith("__override_") then
-                    scope_values[name] = values
-                end
-            end
-
-            -- merge root values with the given scope name
-            local scope_root = scopes._ROOT[scope_kind .. "@@" .. scope_name]
-            if scope_root then
-                for name, values in pairs(scope_root) do
-                    if not scope["__override_" .. name] then
-                        scope_values[name] = table.join(values, scope_values[name] or {})
+                -- add scope values
+                local scope_values = {}
+                for name, values in pairs(scope) do
+                    if not name:startswith("__override_") then
+                        scope_values[name] = values
                     end
                 end
+
+                -- merge root values with the given scope name
+                local scope_root = scopes._ROOT[scope_kind .. "@@" .. scope_name]
+                if scope_root then
+                    for name, values in pairs(scope_root) do
+                        if not scope["__override_" .. name] then
+                            scope_values[name] = table.join(values, scope_values[name] or {})
+                        end
+                    end
+                end
+
+                -- add this scope
+                results[scope_name] = scopeinfo.new(scope_kind, self:_handle(scope_values, remove_repeat, enable_filter), scope_opt)
             end
-
-            -- add this scope
-            results[scope_name] = self:_handle(scope_values, remove_repeat, enable_filter)
         end
-    else
-
-        -- only uses the root scope kind
-        results = self:_handle(scopes._ROOT["__rootkind"], remove_repeat, enable_filter)
     end
-
-    -- ok?
     return results
 end
 
@@ -662,8 +680,8 @@ function interpreter.new()
     return instance
 end
 
--- load results 
-function interpreter:load(file, scope_kind, remove_repeat, enable_filter)
+-- load script file, e.g. xmake.lua 
+function interpreter:load(file)
 
     -- check
     assert(self and self._PUBLIC and self._PRIVATE and file)
@@ -691,18 +709,17 @@ function interpreter:load(file, scope_kind, remove_repeat, enable_filter)
     setfenv(script, self._PUBLIC)
 
     -- do interpreter
-    local ok, errors = xpcall(script, interpreter._traceback)
-    if not ok then
-        return nil, errors
-    end
+    return xpcall(script, interpreter._traceback)
+end
 
-    -- make results
+-- make results 
+function interpreter:make(scope_kind, remove_repeat, enable_filter)
+
+    -- get the results with the given scope
     local ok, results = xpcall(interpreter._make, interpreter._traceback, self, scope_kind, remove_repeat, enable_filter)
     if not ok then
         return nil, results 
     end
-
-    -- ok
     return results
 end
 
@@ -761,12 +778,28 @@ end
 -- the root api will affect these scopes
 --
 function interpreter:rootscope_set(scope_kind)
+    assert(self and self._PRIVATE)
+    self._PRIVATE._ROOTSCOPE = scope_kind
+end
+
+-- get apis
+function interpreter:apis(scope_kind)
 
     -- check
     assert(self and self._PRIVATE)
 
-    -- set it
-    self._PRIVATE._ROOTSCOPE = scope_kind
+    -- get apis from the given scope kind
+    if scope_kind and scope_kind ~= "__rootkind" then
+        local apis = self._PRIVATE._APIS 
+        return apis and apis[scope_kind] or {}
+    else
+        return self._PRIVATE._ROOTAPIS or {}
+    end
+end
+
+-- get api definitions
+function interpreter:api_definitions()
+    return self._API_DEFINITIONS
 end
 
 -- register api 
@@ -1066,6 +1099,11 @@ end
 --   set_$(name1)("key", "value1")
 --   set_$(name2)("key", "value1", "value2", ...)
 --
+-- get:
+--   
+--   get("name")     => {key => values}
+--   get("name.key") => values
+--
 function interpreter:api_register_set_keyvalues(scope_kind, ...)
 
     -- define implementation
@@ -1080,14 +1118,22 @@ function interpreter:api_register_set_keyvalues(scope_kind, ...)
             extra_config = nil
         end
 
-        -- save values
-        name = name .. "." .. key
-        scope[name] = values
+        -- save values to "name"
+        scope[name] = scope[name] or {}
+        scope[name][key] = values
+
+        -- save values to "name.key"
+        local name_key = name .. "." .. key
+        scope[name_key] = values
+
+        -- fix override attributes
+        scope["__override_" .. name] = false
+        scope["__override_" .. name_key] = true
 
         -- save extra config
         if extra_config then
-            scope["__extra_" .. name] = scope["__extra_" .. name] or {}
-            local extrascope = scope["__extra_" .. name]
+            scope["__extra_" .. name_key] = scope["__extra_" .. name_key] or {}
+            local extrascope = scope["__extra_" .. name_key]
             for _, value in ipairs(values) do
                 extrascope[value] = extra_config
             end
@@ -1116,14 +1162,18 @@ function interpreter:api_register_add_keyvalues(scope_kind, ...)
             extra_config = nil
         end
 
-        -- save values
-        name = name .. "." .. key
-        scope[name] = table.join2(scope[name] or {}, values)
+        -- save values to "name"
+        scope[name] = scope[name] or {}
+        scope[name][key] = table.join2(scope[name][key] or {}, values)
+
+        -- save values to "name.key"
+        local name_key = name .. "." .. key
+        scope[name_key] = scope[name][key]
 
         -- save extra config
         if extra_config then
-            scope["__extra_" .. name] = scope["__extra_" .. name] or {}
-            local extrascope = scope["__extra_" .. name]
+            scope["__extra_" .. name_key] = scope["__extra_" .. name_key] or {}
+            local extrascope = scope["__extra_" .. name_key]
             for _, value in ipairs(values) do
                 extrascope[value] = extra_config
             end
@@ -1132,87 +1182,6 @@ function interpreter:api_register_add_keyvalues(scope_kind, ...)
 
     -- register implementation
     self:_api_register_xxx_values(scope_kind, "add", implementation, ...)
-end
-
--- register api for set_array
-function interpreter:api_register_set_array(scope_kind, ...)
-
-    -- check
-    assert(self)
-
-    -- define implementation
-    local implementation = function (self, scope, name, ...)
-
-        -- update array?
-        scope[name] = {}
-        table.insert(scope[name], {...})
-    end
-
-    -- register implementation
-    self:_api_register_xxx_values(scope_kind, "set", implementation, ...)
-end
-
--- register api for add_array
-function interpreter:api_register_add_array(scope_kind, ...)
-
-    -- check
-    assert(self)
-
-    -- define implementation
-    local implementation = function (self, scope, name, ...)
-
-        -- append array?
-        scope[name] = scope[name] or {}
-        table.insert(scope[name], {...})
-    end
-
-    -- register implementation
-    self:_api_register_xxx_values(scope_kind, "add", implementation, ...)
-end
-
--- register api for set_module 
-function interpreter:api_register_set_module(scope_kind, ...)
-
-    -- check
-    assert(self)
-
-    -- define implementation
-    local implementation = function (self, scope, name, modulename)
-
-        -- is module name?
-        if type(modulename) ~= "string" then
-            os.raise("set_%s(): invalid module name!", name)
-        end
-        
-        -- import module as script
-        local script, errors = loadstring(string.format("import(\"%s\", {inherit = true})", modulename))
-        if not script then
-            os.raise("set_%s(): %s", name, errors)
-        end
-
-        -- make sandbox instance with the given script
-        local instance, errors = sandbox.new(script, self:filter(), self:scriptdir())
-        if not instance then
-            os.raise("set_%s(): %s", name, errors)
-        end
-
-        -- load the module
-        local module, errors = instance:module()
-        if not module then
-            os.raise("set_%s(): %s", name, errors)
-        end
-
-        -- init the module
-        if module.init then
-            module.init()
-        end
-    
-        -- save module
-        scope[name] = module
-    end
-
-    -- register implementation
-    self:_api_register_xxx_values(scope_kind, "set", implementation, ...)
 end
 
 -- register api for on_script
@@ -1426,9 +1395,10 @@ end
 -- @endcode
 --
 function interpreter:api_define(apis)
- 
-    -- register language apis
+
+    -- register apis
     local scopes = {}
+    local definitions = self._API_DEFINITIONS or {}
     for apitype, apifuncs in pairs(apis) do
         for _, apifunc in ipairs(apifuncs) do
 
@@ -1443,6 +1413,9 @@ function interpreter:api_define(apis)
                 apiscript   = apifunc[2]
                 apifunc     = apifunc[1]
             end
+
+            -- register api definition, "scope.apiname" => "apitype"
+            definitions[apifunc] = apitype
 
             -- get api function 
             local apiscope = nil
@@ -1492,6 +1465,7 @@ function interpreter:api_define(apis)
             end
         end
     end
+    self._API_DEFINITIONS = definitions
 end
 
 -- the builtin api: set_xmakever()
@@ -1540,16 +1514,23 @@ function interpreter:api_builtin_includes(...)
     -- get all subpathes 
     local subpathes = table.join(...)
 
-    -- match all subpathes
+    -- find all files
     local subpathes_matched = {}
     for _, subpath in ipairs(subpathes) do
+        -- find the given files from the project directory
         local files = os.match(subpath, not subpath:endswith(".lua"))
-        if files then
+        if files and #files > 0 then
             table.join2(subpathes_matched, files) 
+        elseif not path.is_absolute(subpath) then
+            -- attempt to find files from programdir/includes/*.lua
+            files = os.files(path.join(os.programdir(), "includes", subpath))
+            if files and #files > 0 then
+                table.join2(subpathes_matched, files) 
+            end
         end
     end
 
-    -- done
+    -- includes all files
     for _, subpath in ipairs(subpathes_matched) do
         if subpath and type(subpath) == "string" then
 

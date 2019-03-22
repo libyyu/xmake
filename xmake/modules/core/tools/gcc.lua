@@ -16,7 +16,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 -- 
--- Copyright (C) 2015 - 2018, TBOOX Open Source Group.
+-- Copyright (C) 2015 - 2019, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        gcc.lua
@@ -120,8 +120,8 @@ function nf_warning(self, level)
     local maps = 
     {   
         none  = "-w"
-    ,   less  = "-W1"
-    ,   more  = "-W3"
+    ,   less  = "-Wall"
+    ,   more  = "-Wall"
     ,   all   = "-Wall"
     ,   error = "-Werror"
     }
@@ -254,12 +254,12 @@ end
 
 -- make the rpathdir flag
 function nf_rpathdir(self, dir)
-    if self:has_flags("-Wl,-rpath=" .. dir) then
+    if self:has_flags("-Wl,-rpath=" .. dir, "ldflags") then
         return "-Wl,-rpath=" .. os.args(dir:gsub("@[%w_]+", function (name)
             local maps = {["@loader_path"] = "$ORIGIN", ["@executable_path"] = "$ORIGIN"}
             return maps[name]
         end))
-    elseif self:has_flags("-Xlinker -rpath -Xlinker " .. dir) then
+    elseif self:has_flags("-Xlinker -rpath -Xlinker " .. dir, "ldflags") then
         return "-Xlinker -rpath -Xlinker " .. os.args(dir:gsub("%$ORIGIN", "@loader_path"))
     end
 end
@@ -277,10 +277,11 @@ end
 -- make the c precompiled header flag
 function nf_pcheader(self, pcheaderfile, target)
     if self:kind() == "cc" then
+        local pcoutputfile = target:pcoutputfile("c")
         if self:name() == "clang" then
-            return "-include " .. os.args(pcheaderfile) .. " -include-pch " .. os.args(target:pcoutputfile("c"))
+            return "-include " .. os.args(pcheaderfile) .. " -include-pch " .. os.args(pcoutputfile)
         else
-            return "-include " .. os.args(pcheaderfile)
+            return "-include " .. path.filename(pcheaderfile) .. " -I" .. os.args(path.directory(pcoutputfile))
         end
     end
 end
@@ -288,10 +289,11 @@ end
 -- make the c++ precompiled header flag
 function nf_pcxxheader(self, pcheaderfile, target)
     if self:kind() == "cxx" then
+        local pcoutputfile = target:pcoutputfile("cxx")
         if self:name() == "clang" then
-            return "-include " .. os.args(pcheaderfile) .. " -include-pch " .. os.args(target:pcoutputfile("cxx"))
+            return "-include " .. os.args(pcheaderfile) .. " -include-pch " .. os.args(pcoutputfile)
         else
-            return "-include " .. os.args(pcheaderfile)
+            return "-include " .. path.filename(pcheaderfile) .. " -I" .. os.args(path.directory(pcoutputfile))
         end
     end
 end
@@ -308,7 +310,7 @@ function linkargv(self, objectfiles, targetkind, targetfile, flags)
 
     -- add `-Wl,--out-implib,outputdir/libxxx.a` for xxx.dll on mingw/gcc
     if targetkind == "shared" and config.plat() == "mingw" then
-        table.insert(flags_extra, "-Wl,--out-implib," .. os.args(path.join(path.directory(targetfile), path.basename(targetfile) .. ".a")))
+        table.insert(flags_extra, "-Wl,--out-implib," .. os.args(path.join(path.directory(targetfile), path.basename(targetfile) .. ".lib")))
     end
 
     -- make link args
@@ -325,56 +327,73 @@ function link(self, objectfiles, targetkind, targetfile, flags)
     os.runv(linkargv(self, objectfiles, targetkind, targetfile, flags))
 end
 
--- get include deps
-function _include_deps(self, sourcefile, flags)
+-- get compile info
+--
+-- e.g.
+--
+-- ! xxx.gch
+-- . xxx.h
+-- .. xxx.h
+-- ... xxx.h
+-- In file included from src/xxx.c:43:
+-- src/main.c:2:9 warning: xczx
+--   ..
+--
+-- . xxx.h
+-- Multiple include guards may be useful for:
+-- /usr/include/bits/long-double.h
+-- /usr/include/bits/sigaction.h
+-- /usr/include/string
+--
+function _get_compile_info(outdata)
 
-    -- support -E -MM? some old gcc does not support it at same time
-    if _g._HAS_EMM == nil then
-        _g._HAS_EMM = self:has_flags("-E -MM")
-    end
-    if not _g._HAS_EMM then
-        return {}
-    end
-
-    -- the temporary file
-    local tmpfile = os.tmpfile()
-
-    -- uses pchflags for precompiled header
-    if _g._PCHFLAGS then
-        local key = sourcefile .. tostring(flags)
-        local pchflags = _g._PCHFLAGS[key] 
-        if pchflags then
-            flags = pchflags
+    -- filter dependent header info and get compile output 
+    local results = {}
+    for _, line in ipairs(outdata:split("\n")) do
+        if not line:startswith("!") and -- ! xxx.h
+           not line:startswith(".") and -- ... xxx.h
+           not (path.is_absolute(line) and not line:find(':', 3, true)) and -- /usr/xxx/string, C:\xx\string
+           not line:find("%.%a+$") and -- src/xxx.[h|hpp|c|..]
+           not (line:endswith(':') and not line:find("%d")) then -- Multiple include guards may be useful for:
+            table.insert(results, line)
         end
     end
+    return results
+end
 
-    -- generate it
-    os.runv(self:program(), table.join("-c", "-E", "-MM", flags or {}, "-o", tmpfile, sourcefile))
+-- get include deps
+function _get_include_deps(outdata)
 
     -- translate it
-    results = {}
-    local deps = io.readfile(tmpfile)
-    for includefile in string.gmatch(deps, "%s+([%w/%.%-%+_%$%.]+)") do
+    local results = {}
+    local uniques = {}
+    for _, line in ipairs(outdata:split("\n")) do
 
-        -- save it if belong to the project
-        if path.absolute(includefile):startswith(os.projectdir()) then
-            table.insert(results, includefile)
+        -- get includefile, e.g. '! xxx.gch' or '... xxx.h'
+        if line:startswith("!") or line:startswith(".") then
+            local includefile = line:split("%s")[2]
+            if includefile then
+
+                -- get the relative
+                includefile = path.relative(includefile, project.directory())
+
+                -- save it if belong to the project
+                if path.absolute(includefile):startswith(os.projectdir()) then
+
+                    -- insert it and filter repeat
+                    if not uniques[includefile] then
+                        table.insert(results, includefile)
+                        uniques[includefile] = true
+                    end
+                end
+            end
         end
     end
-
-    -- remove the temporary file
-    os.rm(tmpfile)
-
-    -- ok?
     return results
 end
 
 -- make the complie arguments list for the precompiled header
 function _compargv1_pch(self, pcheaderfile, pcoutputfile, flags)
-
-    -- init key and cache
-    local key = pcheaderfile .. tostring(flags)
-    _g._PCHFLAGS = _g._PCHFLAGS or {}
 
     -- remove "-include xxx.h" and "-include-pch xxx.pch"
     local pchflags = {}
@@ -395,9 +414,6 @@ function _compargv1_pch(self, pcheaderfile, pcoutputfile, flags)
         table.insert(pchflags, "-x")
         table.insert(pchflags, "c++-header")
     end
-
-    -- save pchflags to cache
-    _g._PCHFLAGS[key] = pchflags
 
     -- make complie arguments list
     return self:program(), table.join("-c", pchflags, "-o", pcoutputfile, pcheaderfile)
@@ -445,11 +461,23 @@ function _compile1(self, sourcefile, objectfile, dependinfo, flags)
     os.mkdir(path.directory(objectfile))
 
     -- compile it
-    try
+    local outdata, errdata = try
     {
         function ()
-            local outdata, errdata = os.iorunv(_compargv1(self, sourcefile, objectfile, flags))
-            return (outdata or "") .. (errdata or "")
+
+            -- support -H? some old gcc does not support it at same time
+            if _g._HAS_H == nil then
+                _g._HAS_H = self:has_flags("-H", "cxflags")
+            end
+
+            -- generate includes file
+            local compflags = flags
+            if dependinfo and _g._HAS_H then
+                compflags = table.join(flags, "-H")
+            end
+
+            -- do compile
+            return os.iorunv(_compargv1(self, sourcefile, objectfile, compflags))
         end,
         catch
         {
@@ -459,10 +487,10 @@ function _compile1(self, sourcefile, objectfile, dependinfo, flags)
                 os.tryrm(objectfile)
 
                 -- parse and strip errors
+                local lines = _get_compile_info(errors)
                 if not option.get("verbose") then
 
                     -- find the start line of error
-                    local lines = errors:split("\n")
                     local start = 0
                     for index, line in ipairs(lines) do
                         if line:find("error:", 1, true) or line:find("错误：", 1, true) then
@@ -473,31 +501,35 @@ function _compile1(self, sourcefile, objectfile, dependinfo, flags)
 
                     -- get 16 lines of errors
                     if start > 0 then
-                        if start == 0 then start = 1 end
-                        errors = table.concat(table.slice(lines, start, start + ifelse(#lines - start > 16, 16, #lines - start)), "\n")
+                        lines = table.slice(lines, start, start + ifelse(#lines - start > 16, 16, #lines - start))
                     end
                 end
 
                 -- raise compiling errors
-                raise(errors)
+                raise(#lines > 0 and table.concat(lines, "\n") or "")
             end
         },
         finally
         {
-            function (ok, warnings)
+            function (ok, outdata, errdata)
 
-                -- print some warnings
-                if warnings and #warnings > 0 and (option.get("diagnosis") or option.get("warning")) then
-                    cprint("${yellow}%s", table.concat(table.slice(warnings:split('\n'), 1, 8), '\n'))
+                -- show warnings?
+                if ok and errdata and #errdata > 0 and (option.get("diagnosis") or option.get("warning")) then
+                    local lines = _get_compile_info(errdata)
+                    if #lines > 0 then
+                        local warnings = table.concat(table.slice(lines, 1, ifelse(#lines > 8, 8, #lines)), "\n")
+                        cprint("${color.warning}%s", warnings)
+                    end
                 end
             end
         }
     }
 
     -- generate the dependent includes
-    if dependinfo and self:kind() ~= "as" then
+    local depdata = errdata
+    if dependinfo and self:kind() ~= "as" and depdata then
         dependinfo.files = dependinfo.files or {}
-        table.join2(dependinfo.files, _include_deps(self, sourcefile, flags))
+        table.join2(dependinfo.files, _get_include_deps(depdata))
     end
 end
 

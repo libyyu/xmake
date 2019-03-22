@@ -16,7 +16,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 -- 
--- Copyright (C) 2015 - 2018, TBOOX Open Source Group.
+-- Copyright (C) 2015 - 2019, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        main.lua
@@ -49,6 +49,9 @@ function _sudo(cmd)
             -- failed or not permission? request administrator permission and run it again
             function (errors)
 
+                -- trace
+                vprint(errors)
+
                 -- try get privilege
                 if privilege.get() then
                     local ok = try
@@ -69,7 +72,7 @@ function _sudo(cmd)
                 end
 
                 -- show tips
-                cprint("\r${bright red}error: ${default red}run `%s` failed, may permission denied!", cmd)
+                cprint("\r${bright color.error}error: ${clear}run `%s` failed, may permission denied!", cmd)
 
                 -- continue to install with administrator permission?
                 if sudo.has() then
@@ -79,7 +82,7 @@ function _sudo(cmd)
                     if confirm == nil then
 
                         -- show tips
-                        cprint("\r${bright yellow}note: ${default yellow}try continue to run `%s` with administrator permission again?", cmd)
+                        cprint("\r${bright color.warning}note: ${clear}try continue to run `%s` with administrator permission again?", cmd)
                         cprint("\rplease input: y (y/n)")
 
                         -- get answer
@@ -144,8 +147,11 @@ function _install(sourcedir, version)
     -- the install task
     local install_task = function ()
 
+        -- get the install directory
+        local installdir = is_host("windows") and os.programdir() or "~/.local/bin"
+
         -- trace
-        cprintf("\r${yellow}  => ${clear}installing to %s ..  ", os.programdir())
+        cprintf("\r${yellow}  => ${clear}installing to %s ..  ", installdir)
         local ok = try 
         {
             function ()
@@ -155,7 +161,7 @@ function _install(sourcedir, version)
                 if is_host("windows") then
                     local installer = "xmake-" .. version .. ".exe"
                     if os.isfile(installer) then
-                        -- UAC on win7
+                        -- need UAC?
                         if winos:version():gt("winxp") then
                             local proc = process.openv("cscript", {path.join(os.programdir(), "scripts", "sudo.vbs"), installer})
                             if proc ~= nil then
@@ -171,12 +177,7 @@ function _install(sourcedir, version)
                         raise("the installer(%s) not found!", installer)
                     end
                 else
-                    if os.programdir():startswith("/usr/") then
-                        os.vrun("make build")
-                        _sudo("make install") 
-                    else
-                        os.vrun("./scripts/get.sh __local__")
-                    end
+                    os.vrun("./scripts/get.sh __local__")
                 end
                 return true
             end,
@@ -190,7 +191,7 @@ function _install(sourcedir, version)
             
         -- trace
         if ok then
-            cprint("\r${yellow}  => ${clear}install to %s .. ${green}ok", os.programdir())
+            cprint("\r${yellow}  => ${clear}install to %s .. ${green}ok    ", installdir)
         else
             raise("install failed!")
         end
@@ -227,14 +228,16 @@ function main()
     environment.enter()
 
     -- sort main urls
-    local mainurls = {"https://github.com/tboox/xmake.git", "https://gitlab.com/tboox/xmake.git", "https://gitee.com/tboox/xmake.git"}
+    local mainurls = {"https://github.com/xmake-io/xmake.git", "https://gitlab.com/tboox/xmake.git", "https://gitee.com/tboox/xmake.git"}
     fasturl.add(mainurls)
     mainurls = fasturl.sort(mainurls)
 
     -- get version
+    local tags = nil
+    local branches = nil
     local version = nil
     for _, url in ipairs(mainurls) do
-        local tags, branches = git.refs(url)
+        tags, branches = git.refs(url)
         if tags or branches then
             version = semver.select(option.get("xmakever") or "lastest", tags or {}, tags or {}, branches or {})
             break
@@ -250,13 +253,26 @@ function main()
         return
     end
 
-    -- cannot support to update dev/master on windows
+    -- get urls on windows
     if is_host("windows") then
         if version:find('.', 1, true) then
-            mainurls = {format("https://github.com/tboox/xmake/releases/download/%s/xmake-%s.exe", version, version)}
+            mainurls = {format("https://github.com/xmake-io/xmake/releases/download/%s/xmake-%s.exe", version, version),
+                        format("https://qcloud.coding.net/u/waruqi/p/xmake-releases/git/raw/master/xmake-%s.exe", version),
+                        format("https://gitlab.com/xmake-mirror/xmake-releases/raw/master/xmake-%s.exe", version)}
         else
-            raise("not support to update %s on windows!", version)
+            local lastest = semver.select("lastest", tags or {}, tags or {}, {})
+            if lastest then
+                mainurls = {format("https://github.com/xmake-io/xmake/releases/download/%s/xmake-%s.exe", lastest, version),
+                            format("https://qcloud.coding.net/u/waruqi/p/xmake-releases/git/raw/master/xmake-%s.exe", version),
+                            format("https://gitlab.com/xmake-mirror/xmake-releases/raw/master/xmake-%s.exe", version)}
+            else
+                raise("not support to update %s on windows!", version)
+            end
         end
+
+        -- re-sort mainurls
+        fasturl.add(mainurls)
+        mainurls = fasturl.sort(mainurls)
     end
 
     -- trace
@@ -266,7 +282,7 @@ function main()
     local sourcedir = path.join(os.tmpdir(), "xmakesrc", version)
     local download_task = function ()
         for idx, url in ipairs(mainurls) do
-            cprintf("\r${yellow}  => ${clear}clone %s ..  ", url)
+            cprintf("\r${yellow}  => ${clear}downloading %s ..  ", url)
             local ok = try
             {
                 function ()
@@ -292,10 +308,10 @@ function main()
                 }
             }
             if ok then
-                cprint("\r${yellow}  => ${clear}download %s .. ${green}ok", url)
+                cprint("\r${yellow}  => ${clear}download %s .. ${color.success}${text.success}    ", url)
                 break
             else
-                cprint("\r${yellow}  => ${clear}download %s .. ${red}failed", url)
+                cprint("\r${yellow}  => ${clear}download %s .. ${color.failure}${text.failure}    ", url)
             end
             if not ok and idx == #mainurls then
                 raise("download failed!")

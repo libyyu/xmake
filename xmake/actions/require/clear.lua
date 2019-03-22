@@ -16,7 +16,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 -- 
--- Copyright (C) 2015 - 2018, TBOOX Open Source Group.
+-- Copyright (C) 2015 - 2019, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        clear.lua
@@ -33,8 +33,8 @@ function main()
     os.rm(package.cachedir())
 
     -- clear require cache
-    cache.enter("local.require")
-    cache.clear()
-    cache.flush()
+    local require_cache = cache("local.require")
+    require_cache:clear()
+    require_cache:flush()
 end
 

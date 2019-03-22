@@ -16,7 +16,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 -- 
--- Copyright (C) 2015 - 2018, TBOOX Open Source Group.
+-- Copyright (C) 2015 - 2019, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        download.lua
@@ -52,6 +52,7 @@ function _checkout(package, url, sourcedir, url_alias)
 
         -- clean the previous build files
         git.clean({repodir = packagedir, force = true})
+        printf("\r" .. _emptychars() .. "\r")
         return 
     end
 
@@ -81,7 +82,7 @@ function _checkout(package, url, sourcedir, url_alias)
 
     -- trace
     printf("\r" .. _emptychars())
-    cprint("\r${yellow}  => ${clear}clone %s %s .. ${green}ok", url, package:version_str())
+    cprint("\r${yellow}  => ${clear}clone %s %s .. ${color.success}${text.success}", url, package:version_str())
 end
 
 -- download codes from ftp/http/https
@@ -95,7 +96,11 @@ function _download(package, url, sourcedir, url_alias, url_excludes)
     assert(sha256, "cannot get sha256 of %s in package(%s)", url, package:name())
 
     -- the package file have been downloaded?
+    local cached = true
     if option.get("force") or not os.isfile(packagefile) or sha256 ~= hash.sha256(packagefile) then
+
+        -- no cached
+        cached = false
 
         -- attempt to remove package file first
         os.rm(packagefile)
@@ -115,14 +120,22 @@ function _download(package, url, sourcedir, url_alias, url_excludes)
         -- move to source directory
         os.rm(sourcedir)
         os.mv(sourcedir .. ".tmp", sourcedir)
+    else
+        -- create an empty source directory if do not extract package file
+        os.tryrm(sourcedir)
+        os.mkdir(sourcedir)
     end
 
     -- save original file path
     package:originfile_set(path.absolute(packagefile))
 
     -- trace
-    printf("\r" .. _emptychars())
-    cprint("\r${yellow}  => ${clear}download %s .. ${green}ok", url)
+    if not cached then
+        printf("\r" .. _emptychars())
+        cprint("\r${yellow}  => ${clear}download %s .. ${color.success}${text.success}", url)
+    else
+        printf("\r" .. _emptychars() .. "\r")
+    end
 end
 
 -- get sorted urls
@@ -193,16 +206,16 @@ function main(package)
                 function (errors)
 
                     -- verbose?
-                    if option.get("verbose") and errors then
-                        cprint("${bright red}error: ${clear}%s", errors)
+                    if (option.get("verbose") or option.get("diagnosis")) and errors then
+                        cprint("${dim color.error}error: ${clear}%s", errors)
                     end
 
                     -- trace
                     printf("\r" .. _emptychars())
                     if git.checkurl(url) then
-                        cprint("\r${yellow}  => ${clear}clone %s %s .. ${red}failed", url, package:version_str())
+                        cprint("\r${yellow}  => ${clear}clone %s %s .. ${color.failure}${text.failure}", url, package:version_str())
                     else
-                        cprint("\r${yellow}  => ${clear}download %s .. ${red}failed", url)
+                        cprint("\r${yellow}  => ${clear}download %s .. ${color.failure}${text.failure}", url)
                     end
 
                     -- failed? break it

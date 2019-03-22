@@ -16,7 +16,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 -- 
--- Copyright (C) 2015 - 2018, TBOOX Open Source Group.
+-- Copyright (C) 2015 - 2019, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        xmake.lua
@@ -37,11 +37,14 @@ platform("linux")
     -- set formats
     set_formats {static = "lib$(name).a", object = "$(name).o", shared = "lib$(name).so", symbol = "$(name).sym"}
 
-    -- set installdir
+    -- set install directory
     set_installdir("/usr/local")
 
-    -- on check
-    on_check("check")
+    -- on check project configuration
+    on_config_check("config")
+
+    -- on check global configuration
+    on_global_check("global")
 
     -- on load
     on_load("load")
@@ -59,8 +62,9 @@ platform("linux")
 
             ,   global = 
                 {   
-                    {}
+                    {category = "Cuda SDK Configuration"                                            }
                 ,   {nil, "cuda",           "kv", "auto",       "The Cuda SDK Directory"            }
+                ,   {category = "Qt SDK Configuration"                                              }
                 ,   {nil, "qt",             "kv", "auto",       "The Qt SDK Directory"              }
                 }
             }

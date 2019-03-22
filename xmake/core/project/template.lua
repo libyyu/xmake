@@ -16,7 +16,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 -- 
--- Copyright (C) 2015 - 2018, TBOOX Open Source Group.
+-- Copyright (C) 2015 - 2019, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        template.lua
@@ -144,18 +144,24 @@ function template.templates(language)
         -- load template
         for _, templatefile in ipairs(templatefiles) do
 
+            -- load script
+            local ok, errors = interp:load(templatefile)
+            if not ok then
+                os.raise(errors)
+            end
+
             -- load templates
-            local results, errors = interp:load(templatefile, nil, true, true)
+            local results, errors = interp:make(nil, true, true)
             if not results then
                 -- trace
                 os.raise(errors)
             end
 
             -- save template directory
-            results._DIRECTORY = path.directory(templatefile)
+            results:set("_DIRECTORY", path.directory(templatefile))
 
             -- insert to templates
-            table.insert(templates, results)
+            table.insert(templates, results:info())
         end
     end
 

@@ -16,7 +16,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 -- 
--- Copyright (C) 2015 - 2018, TBOOX Open Source Group.
+-- Copyright (C) 2015 - 2019, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        _xmake_main.lua
@@ -42,7 +42,5 @@ local main = require("main")
 
 -- the main function
 function _xmake_main()
-
-    -- done main
-    return main.done()
+    return main.entry()
 end

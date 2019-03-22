@@ -16,7 +16,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 -- 
--- Copyright (C) 2015 - 2018, TBOOX Open Source Group.
+-- Copyright (C) 2015 - 2019, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        compile_commands.lua
@@ -71,7 +71,7 @@ function _make_single_object(jsonfile, target, sourcekind, sourcebatch)
 
     -- not supported now, ignore it directly
     for _, sourcefile in ipairs(table.wrap(sourcebatch.sourcefiles)) do
-        cprint("${bright yellow}warning: ${default yellow}ignore[%s]: %s", target:name(), sourcefile)
+        cprint("${bright color.warning}warning: ${clear}ignore[%s]: %s", target:name(), sourcefile)
     end
 end
 

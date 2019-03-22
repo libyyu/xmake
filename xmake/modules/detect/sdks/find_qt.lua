@@ -16,7 +16,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 -- 
--- Copyright (C) 2015 - 2018, TBOOX Open Source Group.
+-- Copyright (C) 2015 - 2019, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        find_qt.lua
@@ -154,7 +154,7 @@ function main(sdkdir, opt)
     end
        
     -- find qt
-    local qt = _find_qt(sdkdir or config.get("qt") or global.get("qt"), opt.version or config.get("qt_sdkver"))
+    local qt = _find_qt(sdkdir or config.get("qt") or global.get("qt") or config.get("sdk"), opt.version or config.get("qt_sdkver"))
     if qt then
 
         -- save to config
@@ -163,14 +163,14 @@ function main(sdkdir, opt)
 
         -- trace
         if opt.verbose or option.get("verbose") then
-            cprint("checking for the Qt SDK directory ... ${green}%s", qt.sdkdir)
-            cprint("checking for the Qt SDK version ... ${green}%s", qt.sdkver)
+            cprint("checking for the Qt SDK directory ... ${color.success}%s", qt.sdkdir)
+            cprint("checking for the Qt SDK version ... ${color.success}%s", qt.sdkver)
         end
     else
 
         -- trace
         if opt.verbose or option.get("verbose") then
-            cprint("checking for the Qt SDK directory ... ${red}no")
+            cprint("checking for the Qt SDK directory ... ${color.nothing}${text.nothing}")
         end
     end
 

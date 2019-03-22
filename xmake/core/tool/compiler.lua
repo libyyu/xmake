@@ -16,7 +16,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 -- 
--- Copyright (C) 2015 - 2018, TBOOX Open Source Group.
+-- Copyright (C) 2015 - 2019, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        compiler.lua
@@ -51,10 +51,6 @@ function compiler:_addflags_from_platform(flags, targetkind)
     local toolname = self:name()
     for _, flagkind in ipairs(self:_flagkinds()) do
 
-        -- add flags for platform, e.g. gcc.cxflags or cxflags
-        local toolflags = platform.get(toolname .. '.' .. flagkind)
-        table.join2(flags, toolflags or platform.get(flagkind))
-
         -- add flags for platform with the given target kind, e.g. binary.gcc.cxflags or binary.cxflags
         if targetkind then
             local toolflags = platform.get(targetkind .. '.' .. toolname .. '.' .. flagkind)
@@ -77,8 +73,8 @@ function compiler:_addflags_from_compiler(flags, targetkind)
     end
 end
 
--- load the compiler from the given source kind
-function compiler.load(sourcekind, target)
+-- load compiler tool
+function compiler._load_tool(sourcekind, target)
 
     -- get program from target
     local program = nil
@@ -89,27 +85,42 @@ function compiler.load(sourcekind, target)
         end
     end
 
-    -- init key
-    local key = sourcekind .. (program or "")
-
-    -- get it directly from cache dirst
-    compiler._INSTANCES = compiler._INSTANCES or {}
-    if compiler._INSTANCES[key] then
-        return compiler._INSTANCES[key]
-    end
-
-    -- new instance
-    local instance = table.inherit(compiler, builder)
-
     -- load the compiler tool from the source kind
     local result, errors = tool.load(sourcekind, program)
     if not result then 
         return nil, errors
     end
-    instance._TOOL = result
+
+    -- done
+    return result, program
+end 
+
+-- load the compiler from the given source kind
+function compiler.load(sourcekind, target)
+
+    -- load compiler tool first (with cache)
+    local compiler_tool, program_or_errors = compiler._load_tool(sourcekind, target)
+    if not compiler_tool then
+        return nil, program_or_errors
+    end
+
+    -- init cache key
+    local cachekey = sourcekind .. (program_or_errors or "") .. (config.get("arch") or os.arch())
+
+    -- get it directly from cache dirst
+    compiler._INSTANCES = compiler._INSTANCES or {}
+    if compiler._INSTANCES[cachekey] then
+        return compiler._INSTANCES[cachekey]
+    end
+
+    -- new instance
+    local instance = table.inherit(compiler, builder)
+
+    -- save the compiler tool
+    instance._TOOL = compiler_tool
         
     -- load the compiler language from the source kind
-    result, errors = language.load_sk(sourcekind)
+    local result, errors = language.load_sk(sourcekind)
     if not result then 
         return nil, errors
     end
@@ -125,7 +136,15 @@ function compiler.load(sourcekind, target)
     instance._FLAGKINDS = table.wrap(result:sourceflags()[sourcekind])
 
     -- save this instance
-    compiler._INSTANCES[key] = instance
+    compiler._INSTANCES[cachekey] = instance
+
+    -- add platform flags to the compiler tool
+    local toolname = compiler_tool:name()
+    for _, flagkind in ipairs(instance:_flagkinds()) do
+
+        -- add flags for platform, e.g. gcc.cxflags or cxflags
+        compiler_tool:add(flagkind, platform.get(toolname .. '.' .. flagkind) or platform.get(flagkind))
+    end
 
     -- ok
     return instance
@@ -155,8 +174,8 @@ function compiler:build(sourcefiles, targetfile, opt)
 
     -- get target kind
     local targetkind = opt.targetkind
-    if not targetkind and opt.target then
-        targetkind = opt.target:get("kind")
+    if not targetkind and opt.target and opt.target.targetkind then
+        targetkind = opt.target:targetkind()
     end
 
     -- get it
@@ -187,8 +206,8 @@ function compiler:buildargv(sourcefiles, targetfile, opt)
 
     -- get target kind
     local targetkind = opt.targetkind
-    if not targetkind and opt.target then
-        targetkind = opt.target:get("kind")
+    if not targetkind and opt.target and opt.target.targetkind then
+        targetkind = opt.target:targetkind()
     end
 
     -- get it
@@ -261,8 +280,8 @@ function compiler:compflags(opt)
 
     -- get target kind
     local targetkind = opt.targetkind
-    if not targetkind and target then
-        targetkind = target:get("kind")
+    if not targetkind and target and target.targetkind then
+        targetkind = target:targetkind()
     end
 
     -- add flags from the configure 

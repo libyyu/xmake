@@ -16,7 +16,7 @@
 -- See the License for the specific package governing permissions and
 -- limitations under the License.
 -- 
--- Copyright (C) 2015 - 2018, TBOOX Open Source Group.
+-- Copyright (C) 2015 - 2019, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        package.lua
@@ -33,6 +33,7 @@ local path           = require("base/path")
 local utils          = require("base/utils")
 local table          = require("base/table")
 local global         = require("base/global")
+local scopeinfo      = require("base/scopeinfo")
 local interpreter    = require("base/interpreter")
 local sandbox        = require("sandbox/sandbox")
 local config         = require("project/config")
@@ -42,18 +43,10 @@ local sandbox_os     = require("sandbox/modules/os")
 local sandbox_module = require("sandbox/modules/import/core/sandbox/module")
 
 -- new an instance
-function _instance.new(name, info, rootdir)
-
-    -- new an instance
+function _instance.new(name, info)
     local instance = table.inherit(_instance)
-
-    -- init instance
-    instance._name  = name
-    instance._NAME      = name
-    instance._INFO      = info
-    instance._ROOTDIR   = rootdir
-
-    -- ok
+    instance._NAME = name
+    instance._INFO = info
     return instance
 end
 
@@ -61,7 +54,7 @@ end
 function _instance:get(name)
 
     -- get it from info first
-    local value = self._INFO[name]
+    local value = self._INFO:get(name)
     if value ~= nil then
         return value 
     end
@@ -93,6 +86,11 @@ function _instance:arch()
         return os.arch()
     end
     return config.get("arch") or os.arch()
+end
+
+-- get the build mode
+function _instance:mode()
+    return self:debug() and "debug" or "release"
 end
 
 -- get the repository of this package
@@ -207,6 +205,11 @@ function _instance:from(kind)
     return self._FROMKIND == kind
 end
 
+-- get from kind
+function _instance:fromkind()
+    return self._FROMKIND
+end
+
 -- get the package kind, binary or nil(static, shared)
 function _instance:kind()
     return self:get("kind")
@@ -214,14 +217,16 @@ end
 
 -- get the cached directory of this package
 function _instance:cachedir()
-    return path.join(package.cachedir(), self:name():sub(1, 1):lower(), self:name(), self:version_str())
+    local name = self:name():lower():gsub("::", "_")
+    return path.join(package.cachedir(), name:sub(1, 1):lower(), name, self:version_str())
 end
 
 -- get the installed directory of this package
 function _instance:installdir(...)
     
     -- make the given install directory
-    local dir = path.join(package.installdir(self:debug(), self:plat(), self:arch()), self:name():sub(1, 1):lower(), self:name(), self:version_str(), ...)
+    local name = self:name():lower():gsub("::", "_")
+    local dir = path.join(package.installdir(table.concat({self:mode(), self:configs_hash()}, '_'), self:plat(), self:arch()), name:sub(1, 1):lower(), name, self:version_str(), ...)
 
     -- ensure the install directory
     if not os.isdir(dir) then
@@ -234,7 +239,7 @@ end
 function _instance:prefixdir(...)
     
     -- make the given prefix directory
-    local dir = path.join(package.prefixdir(self:from("global"), self:debug(), self:plat(), self:arch()), ...)
+    local dir = path.join(package.prefixdir(self:from("global"), table.concat({self:mode(), self:configs_hash()}, '_'), self:plat(), self:arch()), ...)
 
     -- ensure the prefix directory
     if not os.isdir(dir) then
@@ -254,7 +259,8 @@ end
 
 -- get the prefix info file
 function _instance:prefixfile()
-    return path.join(package.prefixinfodir(self:from("global"), self:debug(), self:plat(), self:arch()), self:name():sub(1, 1):lower(), self:name(), self:version_str(), "info.txt")
+    local name = self:name():lower():gsub("::", "_")
+    return path.join(package.prefixinfodir(self:from("global"), table.concat({self:mode(), self:configs_hash()}, '_'), self:plat(), self:arch()), name:sub(1, 1):lower(), name, self:version_str(), "info.txt")
 end
 
 -- get prefix variables
@@ -294,7 +300,7 @@ function _instance:register()
 
     -- register the environment variables
     for name, values in pairs(table.wrap(self:prefixinfo().envars)) do
-        package.addenv(self:from("global"), self:debug(), self:plat(), self:arch(), name, values)
+        package.addenv(self:from("global"), table.concat({self:mode(), self:configs_hash()}, '_'), self:plat(), self:arch(), name, values)
     end
 end
 
@@ -303,7 +309,7 @@ function _instance:unregister()
 
     -- unregister the environment variables
     for name, values in pairs(table.wrap(self:prefixinfo().envars)) do
-        package.delenv(self:from("global"), self:debug(), self:plat(), self:arch(), name, values)
+        package.delenv(self:from("global"), table.concat({self:mode(), self:configs_hash()}, '_'), self:plat(), self:arch(), name, values)
     end
 end
 
@@ -407,7 +413,7 @@ function _instance:requireinfo_set(requireinfo)
     -- get version
     local version = requireinfo and requireinfo.version or nil
     local limitversion = version and version ~= "master" and version ~= "lastest"
-    if requireinfo then
+    if requireinfo and not self:is3rd() then
         
         -- switch to local package if exists package configuration or debug package or limit version
         if requireinfo.config or requireinfo.debug or limitversion then
@@ -427,6 +433,17 @@ function _instance:configs()
     if requireinfo then
         return requireinfo.config
     end
+end
+
+-- get the hash of configs
+function _instance:configs_hash()
+    if self._CONFIGS_HASH == nil then
+        local configs = self:configs()
+        if configs then
+            self._CONFIGS_HASH = hash.uuid(string.serialize(configs, true)):split('-')[1]:lower()
+        end
+    end
+    return self._CONFIGS_HASH
 end
 
 -- get the group name
@@ -461,10 +478,17 @@ function _instance:debug()
     return requireinfo and requireinfo.debug or false
 end
 
--- is supported package?
+-- is the supported package?
 function _instance:supported()
     -- attempt to get the install script with the current plat/arch
     return self:script("install") ~= nil
+end
+
+-- is the third-party package? e.g. brew::pcre2/libpcre2-8, conan::OpenSSL/1.0.2n@conan/stable 
+-- we need install and find package by third-party package manager directly
+--
+function _instance:is3rd()
+    return self:name():find("::", 1, true)
 end
 
 -- get xxx_script
@@ -539,6 +563,12 @@ function _instance:fetch(opt)
         return fetchinfo, fetchfrom
     end
 
+    -- fetch the require version
+    local require_ver = opt.version or self:requireinfo().version
+    if not require_ver:find('.', 1, true) then
+        require_ver = nil
+    end
+
     -- fetch binary tool?
     fetchinfo = nil
     fetchfrom = nil
@@ -547,7 +577,7 @@ function _instance:fetch(opt)
         -- import find_tool
         self._find_tool = self._find_tool or sandbox_module.import("lib.detect.find_tool", {anonymous = true})
 
-        -- fetch it from the system directories
+        -- fetch it from the system directories, TODO find the given version
         fetchinfo = self._find_tool(self:name(), {force = opt.force})
         if fetchinfo then
             fetchfrom = "system" -- ignore self:requireinfo().system
@@ -562,20 +592,25 @@ function _instance:fetch(opt)
         -- false: only find local packages
         local system = opt.system or self:requireinfo().system
 
-        -- fetch it from the prefix directories first
-        -- and add cache key to make a distinction with finding system package
-        if not fetchinfo and system ~= true then
-            fetchinfo = self._find_package(self:name(), {prefixdirs = self:prefixdir(), 
-                                                         system = false, 
-                                                         global = self:from("local") and false or nil, 
-                                                         cachekey = "fetch:prefix", 
-                                                         force = opt.force or self:from("local")}) 
+        -- only fetch it from the xmake repository first
+        if not fetchinfo and system ~= true and not self:is3rd() then
+            fetchinfo = self._find_package("xmake::" .. self:name(), {prefixdirs = self:prefixdir(), 
+                                                                      mode = self:mode(),
+                                                                      islocal = self:from("local"), 
+                                                                      version = require_ver,
+                                                                      cachekey = "fetch_package_xmake",
+                                                                      configs_hash = self:configs_hash(),
+                                                                      force = opt.force or self:from("local")}) 
             if fetchinfo then fetchfrom = self._FROMKIND end
         end
 
         -- fetch it from the system directories
         if not fetchinfo and system ~= false then
-            fetchinfo = self._find_package(self:name(), {force = opt.force, cachekey = "fetch:system", system = true})
+            fetchinfo = self._find_package(self:name(), {force = opt.force, 
+                                                         version = require_ver, 
+                                                         mode = self:mode(),
+                                                         cachekey = "fetch_package_system",
+                                                         system = true})
             if fetchinfo then fetchfrom = "system" end
         end
     end
@@ -689,51 +724,51 @@ function package.cachedir()
 end
 
 -- the install directory
-function package.installdir(is_debug, plat, arch)
-    return path.join(global.directory(), "installed", plat or os.host(), arch or os.arch(), is_debug and "debug" or "release")
+function package.installdir(mode, plat, arch)
+    return path.join(global.directory(), "installed", plat or os.host(), arch or os.arch(), mode or "release")
 end
 
 -- get the prefix directory
-function package.prefixdir(is_global, is_debug, plat, arch)
-    return path.join(is_global and global.directory() or config.directory(), "prefix", plat or os.host(), arch or os.arch(), is_debug and "debug" or "release")
+function package.prefixdir(is_global, mode, plat, arch)
+    return path.join(is_global and global.directory() or config.directory(), "prefix", plat or os.host(), arch or os.arch(), mode or "release")
 end
 
 -- get the prefix info directory
-function package.prefixinfodir(is_global, is_debug, plat, arch)
-    return path.join(is_global and global.directory() or config.directory(), "prefix", "info", plat or os.host(), arch or os.arch(), is_debug and "debug" or "release")
+function package.prefixinfodir(is_global, mode, plat, arch)
+    return path.join(is_global and global.directory() or config.directory(), "prefix", "info", plat or os.host(), arch or os.arch(), mode or "release")
 end
 
 -- get the prefix info
-function package.prefixinfo(is_global, is_debug, plat, arch)
-    local prefixfile = package.prefixfile(is_global, is_debug, plat, arch)
+function package.prefixinfo(is_global, mode, plat, arch)
+    local prefixfile = package.prefixfile(is_global, mode, plat, arch)
     return os.isfile(prefixfile) and io.load(prefixfile) or {}
 end
 
 -- get the prefix info file
-function package.prefixfile(is_global, is_debug, plat, arch)
-    return path.join(package.prefixinfodir(is_global, is_global, plat, arch), "info.txt")
+function package.prefixfile(is_global, mode, plat, arch)
+    return path.join(package.prefixinfodir(is_global, mode, plat, arch), "info.txt")
 end
 
 -- get environment variables
-function package.getenv(is_global, is_debug, plat, arch, name)
-    local prefixinfo = package.prefixinfo(is_global, is_debug, plat, arch)
+function package.getenv(is_global, mode, plat, arch, name)
+    local prefixinfo = package.prefixinfo(is_global, mode, plat, arch)
     return prefixinfo.envars and prefixinfo.envars[name] or nil
 end
 
 -- add values to environment variable 
-function package.addenv(is_global, is_debug, plat, arch, name, values)
+function package.addenv(is_global, mode, plat, arch, name, values)
 
     -- add to the root prefix info
-    local prefixinfo = package.prefixinfo(is_global, is_debug, plat, arch)
+    local prefixinfo = package.prefixinfo(is_global, mode, plat, arch)
     prefixinfo.envars = prefixinfo.envars or {}
     prefixinfo.envars[name] = table.join(prefixinfo.envars[name] or {}, values)
-    io.save(package.prefixfile(is_global, is_debug, plat, arch), prefixinfo)
+    io.save(package.prefixfile(is_global, mode, plat, arch), prefixinfo)
 
     -- add to the current environment
     if values then
         -- PATH? add the prefix root directory 
         if name:lower() == "path" then
-            local prefixdir = package.prefixdir(is_global, is_debug, plat, arch)
+            local prefixdir = package.prefixdir(is_global, mode, plat, arch)
             for _, value in ipairs(values) do
                 os.addenv(name, path.join(prefixdir, value))
             end
@@ -744,8 +779,8 @@ function package.addenv(is_global, is_debug, plat, arch, name, values)
 end
 
 -- remove values to environment variable 
-function package.delenv(is_global, is_debug, plat, arch, name, values)
-    local prefixinfo = package.prefixinfo(is_global, is_debug, plat, arch)
+function package.delenv(is_global, mode, plat, arch, name, values)
+    local prefixinfo = package.prefixinfo(is_global, mode, plat, arch)
     local prefixvalues = prefixinfo.envars and prefixinfo.envars[name] or nil
     if prefixvalues then
         local exists = {}
@@ -758,7 +793,7 @@ function package.delenv(is_global, is_debug, plat, arch, name, values)
                 table.remove(prefixvalues, i)
             end
         end
-        io.save(package.prefixfile(is_global, is_debug, plat, arch), prefixinfo)
+        io.save(package.prefixfile(is_global, mode, plat, arch), prefixinfo)
     end
 end
 
@@ -771,8 +806,34 @@ function package.load_from_system(packagename)
         return package._PACKAGES[packagename]
     end
 
-    -- new an empty instance
-    local instance, errors = _instance.new(packagename, {}, package._interpreter():rootdir())
+    -- get package info
+    local packageinfo = {}
+    if packagename:find("::", 1, true) then
+
+        -- get interpreter
+        local interp = package._interpreter()
+
+        -- on install script
+        local on_install = function (pkg)
+            local opt = table.copy(pkg:configs())
+            opt.mode = pkg:debug() and "debug" or "release"
+            opt.plat = pkg:plat()
+            opt.arch = pkg:arch()
+            import("package.manager.install_package")(pkg:name(), opt)
+        end
+
+        -- make sandbox instance with the given script
+        local instance, errors = sandbox.new(on_install, interp:filter())
+        if not instance then
+            return nil, errors
+        end
+
+        -- save the install script
+        packageinfo.install = instance:script()
+    end
+
+    -- new an instance
+    local instance, errors = _instance.new(packagename, scopeinfo.new("package", packageinfo))
     if not instance then
         return nil, errors
     end
@@ -802,16 +863,13 @@ function package.load_from_project(packagename, project)
         return nil, errors
     end
 
-    -- get interpreter
-    local interp = project.interpreter() or package._interpreter()
-
     -- not found?
     if not packages[packagename] then
         return
     end
 
     -- new an instance
-    local instance, errors = _instance.new(packagename, packages[packagename], interp:rootdir())
+    local instance, errors = _instance.new(packagename, packages[packagename])
     if not instance then
         return nil, errors
     end
@@ -847,9 +905,18 @@ function package.load_from_repository(packagename, repo, packagedir, packagefile
         return nil, string.format("the package %s not found!", packagename)
     end
 
+    -- get interpreter
+    local interp = package._interpreter()
+
+    -- load script
+    local ok, errors = interp:load(scriptpath)
+    if not ok then
+        return nil, errors
+    end
+
     -- load package and disable filter, we will process filter after a while
-    local results, errors = package._interpreter():load(scriptpath, "package", true, false)
-    if not results and os.isfile(scriptpath) then
+    local results, errors = interp:make("package", true, false)
+    if not results then
         return nil, errors
     end
 
@@ -867,7 +934,7 @@ function package.load_from_repository(packagename, repo, packagedir, packagefile
     end
 
     -- new an instance
-    local instance, errors = _instance.new(packagename, packageinfo, package._interpreter():rootdir())
+    local instance, errors = _instance.new(packagename, packageinfo)
     if not instance then
         return nil, errors
     end

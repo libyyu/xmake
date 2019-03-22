@@ -16,7 +16,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 -- 
--- Copyright (C) 2015 - 2018, TBOOX Open Source Group.
+-- Copyright (C) 2015 - 2019, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        main.lua
@@ -52,6 +52,11 @@ end
 -- do clean target 
 function _do_clean_target(target)
 
+    -- is phony?
+    if target:isphony() then
+        return 
+    end
+
     -- remove the target file 
     _remove(target:targetfile()) 
 
@@ -71,8 +76,8 @@ function _do_clean_target(target)
     -- remove the depend files 
     _remove(target:dependfiles())
 
-    -- remove the header files 
-    local _, dstheaders = target:headerfiles()
+    -- TODO remove the header files (deprecated)
+    local _, dstheaders = target:headers()
     _remove(dstheaders) 
 
     -- remove all?

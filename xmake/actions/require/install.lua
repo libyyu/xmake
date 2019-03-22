@@ -16,7 +16,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 -- 
--- Copyright (C) 2015 - 2018, TBOOX Open Source Group.
+-- Copyright (C) 2015 - 2019, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        package.lua
@@ -125,7 +125,7 @@ function main(requires)
     -- init requires
     local requires_extra = nil
     if not requires then
-        requires, requires_extra = project.get("requires"), project.get("__extra_requires")
+        requires, requires_extra = project.requires_str()
     end
     if not requires or #requires == 0 then
         return 

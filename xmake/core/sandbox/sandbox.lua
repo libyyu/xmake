@@ -16,7 +16,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 -- 
--- Copyright (C) 2015 - 2018, TBOOX Open Source Group.
+-- Copyright (C) 2015 - 2019, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        sandbox.lua
@@ -36,15 +36,20 @@ local option    = require("base/option")
 -- traceback
 function sandbox._traceback(errors)
 
-    -- only print error info without backtrace if not diagnosis?
+    -- no diagnosis info?
     if not option.get("diagnosis") then
         if errors then
             -- remove the prefix info
             local _, pos = errors:find(":%d+: ")
             if pos then
-                return errors:sub(pos + 1)
+                errors = errors:sub(pos + 1)
             end
         end
+        return errors
+    end
+
+    -- traceback exists?
+    if errors and errors:find("stack traceback:", 1, true) then
         return errors
     end
 
@@ -176,8 +181,6 @@ end
 
 -- load script in the sandbox
 function sandbox.load(script, ...)
-
-    -- load script
     return xpcall(script, sandbox._traceback, ...)
 end
 

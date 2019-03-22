@@ -16,7 +16,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 -- 
--- Copyright (C) 2015 - 2018, TBOOX Open Source Group.
+-- Copyright (C) 2015 - 2019, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        nvcc.lua
@@ -134,12 +134,12 @@ end
 
 -- make the rpathdir flag
 function nf_rpathdir(self, dir)
-    if self:has_flags("-Wl,-rpath=" .. dir) then
+    if self:has_flags("-Wl,-rpath=" .. dir, "ldflags") then
         return "-Wl,-rpath=" .. os.args(dir:gsub("@[%w_]+", function (name)
             local maps = {["@loader_path"] = "$ORIGIN", ["@executable_path"] = "$ORIGIN"}
             return maps[name]
         end))
-    elseif self:has_flags("-Xlinker -rpath -Xlinker " .. dir) then
+    elseif self:has_flags("-Xlinker -rpath -Xlinker " .. dir, "ldflags") then
         return "-Xlinker -rpath -Xlinker " .. os.args(dir:gsub("%$ORIGIN", "@loader_path"))
     end
 end
@@ -166,7 +166,7 @@ function linkargv(self, objectfiles, targetkind, targetfile, flags)
 
     -- add `-Wl,--out-implib,outputdir/libxxx.a` for xxx.dll on mingw/gcc
     if targetkind == "shared" and config.plat() == "mingw" then
-        table.insert(flags_extra, "-Wl,--out-implib," .. os.args(path.join(path.directory(targetfile), path.basename(targetfile) .. ".a")))
+        table.insert(flags_extra, "-Wl,--out-implib," .. os.args(path.join(path.directory(targetfile), path.basename(targetfile) .. ".lib")))
     end
 
     -- make link args
@@ -258,7 +258,7 @@ function _compile1(self, sourcefile, objectfile, dependinfo, flags)
 
                 -- print some warnings
                 if warnings and #warnings > 0 and (option.get("verbose") or option.get("warning")) then
-                    cprint("${yellow}%s", table.concat(table.slice(warnings:split('\n'), 1, 8), '\n'))
+                    cprint("${color.warning}%s", table.concat(table.slice(warnings:split('\n'), 1, 8), '\n'))
                 end
             end
         }

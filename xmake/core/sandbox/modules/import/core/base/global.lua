@@ -16,7 +16,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 -- 
--- Copyright (C) 2015 - 2018, TBOOX Open Source Group.
+-- Copyright (C) 2015 - 2019, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        global.lua
@@ -26,6 +26,7 @@
 local sandbox_core_base_global = sandbox_core_base_global or {}
 
 -- load modules
+local os        = require("base/os")
 local table     = require("base/table")
 local global    = require("base/global")
 local platform  = require("platform/platform")
@@ -56,11 +57,6 @@ function sandbox_core_base_global.dump()
     global.dump()
 end
 
--- load the configure
-function sandbox_core_base_global.load()
-    return global.load()
-end
-
 -- save the configure
 function sandbox_core_base_global.save()
 
@@ -69,6 +65,11 @@ function sandbox_core_base_global.save()
     if not ok then
         raise(errors)
     end
+end
+
+-- clear the configure
+function sandbox_core_base_global.clear()
+    return global.clear()
 end
 
 -- check the configure
@@ -85,17 +86,11 @@ function sandbox_core_base_global.check()
 
         -- belong to the current host?
         for _, host in ipairs(table.wrap(instance:hosts())) do
-            if host == xmake._HOST then
-
-                -- get the check script
-                local check = instance:get("check")
-                if check ~= nil then
-
-                    -- check it
-                    check("global")
+            if host == os.host() then
+                local on_check = instance:script("global_check")
+                if on_check then
+                    on_check(instance)
                 end
-
-                -- ok
                 break
             end
         end

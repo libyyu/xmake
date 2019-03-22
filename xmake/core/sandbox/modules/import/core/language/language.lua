@@ -16,7 +16,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 -- 
--- Copyright (C) 2015 - 2018, TBOOX Open Source Group.
+-- Copyright (C) 2015 - 2019, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        language.lua
@@ -28,6 +28,11 @@ local sandbox_core_language = sandbox_core_language or {}
 -- load modules
 local language  = require("language/language")
 local raise     = require("sandbox/modules/raise")
+
+-- get the apis
+function sandbox_core_language.apis()
+    return language.apis()
+end
 
 -- get the source extensions of all languages
 function sandbox_core_language.extensions()

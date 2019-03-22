@@ -16,7 +16,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 -- 
--- Copyright (C) 2015 - 2018, TBOOX Open Source Group.
+-- Copyright (C) 2015 - 2019, TBOOX Open Source Group.
 --
 -- @author      ruki
 -- @file        xmake.lua
@@ -60,6 +60,11 @@ language("cuda")
         ,   "target.optimize:check"
         ,   "target.vectorexts:check"
         ,   "target.includedirs"
+        ,   "option.symbols"
+        ,   "option.warnings"
+        ,   "option.optimize:check"
+        ,   "option.vectorexts:check"
+        ,   "option.includedirs"
         ,   "platform.includedirs"
         }
     ,   binary =
