@@ -119,10 +119,10 @@ function _make_targetinfo(mode, arch, target)
         table.insert(targetinfo.linkdirs, v)
         linkdir_map[v] = true
     end
-    print(target:name(), targetinfo.targetkind)
+
     -- deps
     targetinfo.deps = table.copy(target:get("deps"))
-    if targetinfo.targetkind == "static" then
+    --if targetinfo.targetkind == "static" then
     	for k, v in pairs(targetinfo.deps) do
     		if not link_map[v] then
     			table.insert(targetinfo.links, v)
@@ -133,7 +133,7 @@ function _make_targetinfo(mode, arch, target)
     			end
     		end
     	end
-    end
+    --end
     
     -- ldflags
     targetinfo.ldflags = table.copy(target:get("ldflags"))
@@ -1348,7 +1348,7 @@ function make(outputdir)
 
             -- save targets
             for targetname, target in pairs(project.targets()) do
-            	print("checking for the %s.%s.%s ...", targetname, mode, arch)
+            	print("checking for the %s.%s.%s ... %s", targetname, mode, arch, target:targetfile())
                 -- make target with the given mode and arch
                 targets[targetname] = targets[targetname] or {}
                 local _target = targets[targetname]
