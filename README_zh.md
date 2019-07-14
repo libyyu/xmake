@@ -1,13 +1,13 @@
 <div align="center">
-  <a href="http://xmake.io/cn">
-    <img width="200" heigth="200" src="http://tboox.org/static/img/xmake/logo256c.png">
+  <a href="https://xmake.io/cn">
+    <img width="200" heigth="200" src="https://tboox.org/static/img/xmake/logo256c.png">
   </a>  
 
   <h1>xmake</h1>
 
   <div>
-    <a href="https://travis-ci.org/tboox/xmake">
-      <img src="https://img.shields.io/travis/tboox/xmake/master.svg?style=flat-square" alt="travis-ci" />
+    <a href="https://travis-ci.org/xmake-io/xmake">
+      <img src="https://img.shields.io/travis/xmake-io/xmake/master.svg?style=flat-square" alt="travis-ci" />
     </a>
     <a href="https://ci.appveyor.com/project/waruqi/xmake/branch/master">
       <img src="https://img.shields.io/appveyor/ci/waruqi/xmake/master.svg?style=flat-square" alt="appveyor-ci" />
@@ -15,13 +15,13 @@
     <a href="https://aur.archlinux.org/packages/xmake">
       <img src="https://img.shields.io/aur/votes/xmake.svg?style=flat-square" alt="AUR votes" />
     </a>
-    <a href="https://github.com/tboox/xmake/releases">
-      <img src="https://img.shields.io/github/release/tboox/xmake.svg?style=flat-square" alt="Github All Releases" />
+    <a href="https://github.com/xmake-io/xmake/releases">
+      <img src="https://img.shields.io/github/release/xmake-io/xmake.svg?style=flat-square" alt="Github All Releases" />
     </a>
   </div>
   <div>
-    <a href="https://github.com/tboox/xmake/blob/master/LICENSE.md">
-      <img src="https://img.shields.io/github/license/tboox/xmake.svg?colorB=f48041&style=flat-square" alt="license" />
+    <a href="https://github.com/xmake-io/xmake/blob/master/LICENSE.md">
+      <img src="https://img.shields.io/github/license/xmake-io/xmake.svg?colorB=f48041&style=flat-square" alt="license" />
     </a>
     <a href="https://www.reddit.com/r/tboox/">
       <img src="https://img.shields.io/badge/chat-on%20reddit-ff3f34.svg?style=flat-square" alt="Reddit" />
@@ -56,41 +56,33 @@ xmake的目标是开发者更加关注于项目本身开发，简化项目的描
 
 不仅如此，它还提供了许多更加高级的特性，例如插件扩展、脚本宏记录、批量打包、自动文档生成等等。。
 
+<img src="https://xmake.io/assets/img/index/package_manage.png" width="80%" />
+
 如果你想要了解更多，请参考：
 
-* [在线文档](http://xmake.io/#/zh/)
-* [项目主页](http://www.xmake.io/cn)
-* [Github](https://github.com/tboox/xmake)
+* [在线文档](https://xmake.io/#/zh/)
+* [项目主页](https://xmake.io/cn)
+* [Github](https://github.com/xmake-io/xmake)
 * [Gitee](https://gitee.com/tboox/xmake)
-
-```
-                         _        
-    __  ___ __  __  __ _| | ______ 
-    \ \/ / |  \/  |/ _  | |/ / __ \
-     >  <  | \__/ | /_| |   <  ___/
-    /_/\_\_|_|  |_|\__ \|_|\_\____| 
-
-                         by ruki, tboox.org
-```
 
 ## 安装
 
 #### 使用curl
 
 ```bash
-bash <(curl -fsSL https://raw.githubusercontent.com/tboox/xmake/master/scripts/get.sh)
+bash <(curl -fsSL https://raw.githubusercontent.com/xmake-io/xmake/master/scripts/get.sh)
 ```
 
 #### 使用wget
 
 ```bash
-bash <(wget https://raw.githubusercontent.com/tboox/xmake/master/scripts/get.sh -O -)
+bash <(wget https://raw.githubusercontent.com/xmake-io/xmake/master/scripts/get.sh -O -)
 ```
 
 #### 使用powershell
 
 ```bash
-Invoke-Expression (Invoke-Webrequest 'https://raw.githubusercontent.com/tboox/xmake/master/scripts/get.ps1' -UseBasicParsing).Content
+Invoke-Expression (Invoke-Webrequest 'https://raw.githubusercontent.com/xmake-io/xmake/master/scripts/get.ps1' -UseBasicParsing).Content
 ```
 
 ## 简单的工程描述
@@ -101,7 +93,7 @@ Invoke-Expression (Invoke-Webrequest 'https://raw.githubusercontent.com/tboox/xm
 
 <img src="https://xmake.io/assets/img/index/add_require.png" width="70%" />
 
-官方的xmake包管理仓库: [xmake-repo](https://github.com/tboox/xmake-repo)
+官方的xmake包管理仓库: [xmake-repo](https://github.com/xmake-io/xmake-repo)
 
 ## 构建工程
 
@@ -170,8 +162,17 @@ $ xmake f --menu
 * Qt应用程序
 * WDK驱动程序
 * WinSDK应用程序
+* MFC应用程序
 
 ## 内置插件
+
+#### 生成IDE工程文件插件（makefile, vs2002 - vs2019, ...）
+
+```bash
+$ xmake project -k vs2017 -m "debug,release"
+$ xmake project -k cmakelists
+$ xmake project -k compile_commands
+```
 
 #### 宏记录脚本和回放插件
 
@@ -193,12 +194,6 @@ $ xmake l -c "print('hello xmake!')"
 $ xmake l lib.detect.find_tool gcc
 ```
 
-#### 生成IDE工程文件插件（makefile, vs2002 - vs2017, ...）
-
-```bash
-$ xmake project -k vs2017 -m "debug,release"
-```
-
 #### 生成doxygen文档插件
 
 ```bash
@@ -207,19 +202,19 @@ $ xmake doxygen [srcdir]
 
 ## 更多插件
 
-请到插件仓库进行下载安装: [xmake-plugins](https://github.com/tboox/xmake-plugins).
+请到插件仓库进行下载安装: [xmake-plugins](https://github.com/xmake-io/xmake-plugins).
 
 ## IDE和编辑器插件
 
-* [xmake-vscode](https://github.com/tboox/xmake-vscode)
+* [xmake-vscode](https://github.com/xmake-io/xmake-vscode)
 
 <img src="https://raw.githubusercontent.com/tboox/xmake-vscode/master/res/problem.gif" width="60%" />
 
-* [xmake-sublime](https://github.com/tboox/xmake-sublime)
+* [xmake-sublime](https://github.com/xmake-io/xmake-sublime)
 
 <img src="https://raw.githubusercontent.com/tboox/xmake-sublime/master/res/problem.gif" width="60%" />
 
-* [xmake-idea](https://github.com/tboox/xmake-idea)
+* [xmake-idea](https://github.com/xmake-io/xmake-idea)
 
 <img src="https://raw.githubusercontent.com/tboox/xmake-idea/master/res/problem.gif" width="60%" />
 
@@ -235,31 +230,41 @@ add_rules("mode.debug", "mode.release")
 target("console")
     set_kind("binary")
     add_files("src/*.c") 
-    if is_plat("windows", "mingw") then
-        add_defines("XXX")
+    if is_mode("debug") then
+        add_defines("DEBUG")
     end
 ```
 
-自定义脚本：
+下载和使用在[xmake-repo](https://github.com/xmake-io/xmake-repo)的依赖包：
 
 ```lua
+add_requires("libuv master", "ffmpeg", "zlib 1.20.*")
+add_requires("tbox >1.6.1", {optional = true, debug = true})
 target("test")
-    set_kind("static")
-    add_files("src/*.cpp")
-    after_build(function (target)
-        print("build %s ok!", target:targetfile())
-    end)
+    set_kind("shared")
+    add_files("src/*.c")
+    add_packages("libuv", "ffmpeg", "tbox", "zlib")
 ```
 
-使用扩展模块：
+下载和使用第三方包管理器的依赖包：
+
+```lua
+add_requires("brew::pcre2/libpcre2-8", {alias = "pcre2"})
+add_requires("conan::OpenSSL/1.0.2n@conan/stable", {alias = "openssl"}) 
+target("test")
+    set_kind("shared")
+    add_files("src/*.c")
+    add_packages("pcre2", "openssl")
+```
+
+查找和使用本地已安装的包：
 
 ```lua
 target("test")
     set_kind("shared")
     add_files("src/*.c")
     on_load(function (target)
-        import("lib.detect.find_package")
-        target:add(find_package("zlib"))
+        target:add(find_packages("zlib", "openssl", "brew::pcre2/libpcre2-8", "conan::OpenSSL/1.0.2n@conan/stable"))
     end)
 ```
 
@@ -270,7 +275,7 @@ target("test")
 * [tbox](https://github.com/tboox/tbox)
 * [gbox](https://github.com/tboox/gbox)
 * [vm86](https://github.com/tboox/vm86)
-* [更多](https://github.com/tboox/awesome-xmake)
+* [更多](https://github.com/xmake-io/awesome-xmake)
 
 ## 演示视频
 
@@ -281,20 +286,21 @@ target("test")
 ## 联系方式
 
 * 邮箱：[waruqi@gmail.com](mailto:waruqi@gmail.com)
-* 主页：[tboox.org](http://www.tboox.org/cn)
+* 主页：[tboox.org](https://tboox.org/cn)
 * 社区：[Reddit论坛](https://www.reddit.com/r/tboox/)
 * 聊天：[Telegram群组](https://t.me/tbooxorg), [Gitter聊天室](https://gitter.im/tboox/tboox?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
-* 源码：[Github](https://github.com/tboox/xmake), [Gitee](https://gitee.com/tboox/xmake)
+* 源码：[Github](https://github.com/xmake-io/xmake), [Gitee](https://gitee.com/tboox/xmake)
 * QQ群：343118190
 * 微信公众号：tboox-os
  
 ## 感谢
 
 感谢所有对xmake有所[贡献](CONTRIBUTING.md)的人:
-<a href="https://github.com/tboox/xmake/graphs/contributors"><img src="https://opencollective.com/xmake/contributors.svg?width=890&button=false" /></a>
+<a href="https://github.com/xmake-io/xmake/graphs/contributors"><img src="https://opencollective.com/xmake/contributors.svg?width=890&button=false" /></a>
 
 * [TitanSnow](https://github.com/TitanSnow): 提供xmake [logo](https://github.com/TitanSnow/ts-xmake-logo) 和安装脚本
 * [uael](https://github.com/uael): 提供语义版本跨平台c库 [sv](https://github.com/uael/sv)
+* [OpportunityLiu](https://github.com/OpportunityLiu): 改进cuda构建, tests框架和ci
 
 ## 支持项目
 

@@ -1,13 +1,13 @@
 <div align="center">
-  <a href="http://xmake.io">
-    <img width="200" heigth="200" src="http://tboox.org/static/img/xmake/logo256c.png">
+  <a href="https://xmake.io">
+    <img width="200" heigth="200" src="https://tboox.org/static/img/xmake/logo256c.png">
   </a>  
 
   <h1>xmake</h1>
 
   <div>
-    <a href="https://travis-ci.org/tboox/xmake">
-      <img src="https://img.shields.io/travis/tboox/xmake/master.svg?style=flat-square" alt="travis-ci" />
+    <a href="https://travis-ci.org/xmake-io/xmake">
+      <img src="https://img.shields.io/travis/xmake-io/xmake/master.svg?style=flat-square" alt="travis-ci" />
     </a>
     <a href="https://ci.appveyor.com/project/waruqi/xmake/branch/master">
       <img src="https://img.shields.io/appveyor/ci/waruqi/xmake/master.svg?style=flat-square" alt="appveyor-ci" />
@@ -15,13 +15,13 @@
     <a href="https://aur.archlinux.org/packages/xmake">
       <img src="https://img.shields.io/aur/votes/xmake.svg?style=flat-square" alt="AUR votes" />
     </a>
-    <a href="https://github.com/tboox/xmake/releases">
-      <img src="https://img.shields.io/github/release/tboox/xmake.svg?style=flat-square" alt="Github All Releases" />
+    <a href="https://github.com/xmake-io/xmake/releases">
+      <img src="https://img.shields.io/github/release/xmake-io/xmake.svg?style=flat-square" alt="Github All Releases" />
     </a>
   </div>
   <div>
-    <a href="https://github.com/tboox/xmake/blob/master/LICENSE.md">
-      <img src="https://img.shields.io/github/license/tboox/xmake.svg?colorB=f48041&style=flat-square" alt="license" />
+    <a href="https://github.com/xmake-io/xmake/blob/master/LICENSE.md">
+      <img src="https://img.shields.io/github/license/xmake-io/xmake.svg?colorB=f48041&style=flat-square" alt="license" />
     </a>
     <a href="https://www.reddit.com/r/tboox/">
       <img src="https://img.shields.io/badge/chat-on%20reddit-ff3f34.svg?style=flat-square" alt="Reddit" />
@@ -47,44 +47,36 @@
 
 xmake is a cross-platform build utility based on lua. 
 
-The project focuses on making development and building easier and provides many features (.e.g package, install, plugin, macro, action, option, task ...), 
-so that any developer can quickly pick it up and enjoy the productivity boost when developing and building project.
+The project focuses on making development and building easier and provides many features (e.g package, install, plugin, macro, action, option, task ...), 
+so that any developer can quickly pick it up and enjoy a productivity boost when developing and building projects.
 
-If you want to known more, please refer to:
+<img src="https://xmake.io/assets/img/index/package_manage.png" width="80%" />
 
-* [Documents](http://xmake.io/#/home)
-* [HomePage](http://www.xmake.io)
-* [Github](https://github.com/tboox/xmake)
+If you want to know more, please refer to:
+
+* [Documents](https://xmake.io/#/home)
+* [HomePage](https://xmake.io)
+* [Github](https://github.com/xmake-io/xmake)
 * [Gitee](https://gitee.com/tboox/xmake)
-
-```
-                         _        
-    __  ___ __  __  __ _| | ______ 
-    \ \/ / |  \/  |/ _  | |/ / __ \
-     >  <  | \__/ | /_| |   <  ___/
-    /_/\_\_|_|  |_|\__ \|_|\_\____| 
-
-                         by ruki, tboox.org
-```
 
 ## Installation
 
 #### via curl
 
 ```bash
-bash <(curl -fsSL https://raw.githubusercontent.com/tboox/xmake/master/scripts/get.sh)
+bash <(curl -fsSL https://raw.githubusercontent.com/xmake-io/xmake/master/scripts/get.sh)
 ```
 
 #### via wget
 
 ```bash
-bash <(wget https://raw.githubusercontent.com/tboox/xmake/master/scripts/get.sh -O -)
+bash <(wget https://raw.githubusercontent.com/xmake-io/xmake/master/scripts/get.sh -O -)
 ```
 
 #### via powershell
 
 ```bash
-Invoke-Expression (Invoke-Webrequest 'https://raw.githubusercontent.com/tboox/xmake/master/scripts/get.ps1' -UseBasicParsing).Content
+Invoke-Expression (Invoke-Webrequest 'https://raw.githubusercontent.com/xmake-io/xmake/master/scripts/get.ps1' -UseBasicParsing).Content
 ```
 
 ## Simple description
@@ -95,7 +87,7 @@ Invoke-Expression (Invoke-Webrequest 'https://raw.githubusercontent.com/tboox/xm
 
 <img src="https://xmake.io/assets/img/index/add_require.png" width="70%" />
 
-An official xmake package repository: [xmake-repo](https://github.com/tboox/xmake-repo)
+An official xmake package repository: [xmake-repo](https://github.com/xmake-io/xmake-repo)
 
 ## Build project
 
@@ -165,8 +157,17 @@ $ xmake f --menu
 * Qt Application
 * WDK Driver (umdf/kmdf/wdm)
 * WinSDK Application
+* MFC Application
 
 ## Builtin Plugins
+
+#### Generate IDE project file plugin（makefile, vs2002 - vs2019 .. ）
+
+```bash
+$ xmake project -k vs2017 -m "debug,release"
+$ xmake project -k cmakelists
+$ xmake project -k compile_commands
+```
 
 #### Macros script plugin
 
@@ -188,12 +189,6 @@ $ xmake l -c "print('hello xmake!')"
 $ xmake l lib.detect.find_tool gcc
 ```
 
-#### Generate IDE project file plugin（makefile, vs2002 - vs2017 .. ）
-
-```bash
-$ xmake project -k vs2017 -m "debug,release"
-```
-
 #### Generate doxygen document plugin
 
 ```bash
@@ -202,19 +197,19 @@ $ xmake doxygen [srcdir]
 
 ## More Plugins
 
-Please download and install from the plugins repository [xmake-plugins](https://github.com/tboox/xmake-plugins).
+Please download and install from the plugins repository [xmake-plugins](https://github.com/xmake-io/xmake-plugins).
 
 ## IDE/Editor Integration
 
-* [xmake-vscode](https://github.com/tboox/xmake-vscode)
+* [xmake-vscode](https://github.com/xmake-io/xmake-vscode)
 
 <img src="https://raw.githubusercontent.com/tboox/xmake-vscode/master/res/problem.gif" width="60%" />
 
-* [xmake-sublime](https://github.com/tboox/xmake-sublime)
+* [xmake-sublime](https://github.com/xmake-io/xmake-sublime)
 
 <img src="https://raw.githubusercontent.com/tboox/xmake-sublime/master/res/problem.gif" width="60%" />
 
-* [xmake-idea](https://github.com/tboox/xmake-idea)
+* [xmake-idea](https://github.com/xmake-io/xmake-idea)
 
 <img src="https://raw.githubusercontent.com/tboox/xmake-idea/master/res/problem.gif" width="60%" />
 
@@ -230,31 +225,41 @@ add_rules("mode.debug", "mode.release")
 target("console")
     set_kind("binary")
     add_files("src/*.c") 
-    if is_plat("windows", "mingw") then
-        add_defines("XXX")
+    if is_mode("debug") then
+        add_defines("DEBUG")
     end
 ```
 
-Custom script:
+Download and use packages in [xmake-repo](https://github.com/xmake-io/xmake-repo):
 
 ```lua
+add_requires("libuv master", "ffmpeg", "zlib 1.20.*")
+add_requires("tbox >1.6.1", {optional = true, debug = true})
 target("test")
-    set_kind("static")
-    add_files("src/*.cpp")
-    after_build(function (target)
-        print("build %s ok!", target:targetfile())
-    end)
+    set_kind("shared")
+    add_files("src/*.c")
+    add_packages("libuv", "ffmpeg", "tbox", "zlib")
 ```
 
-Extension Modules:
+Download and use packages in third-party package manager:
+
+```lua
+add_requires("brew::pcre2/libpcre2-8", {alias = "pcre2"})
+add_requires("conan::OpenSSL/1.0.2n@conan/stable", {alias = "openssl"}) 
+target("test")
+    set_kind("shared")
+    add_files("src/*.c")
+    add_packages("pcre2", "openssl")
+```
+
+Find and use local packages:
 
 ```lua
 target("test")
     set_kind("shared")
     add_files("src/*.c")
     on_load(function (target)
-        import("lib.detect.find_package")
-        target:add(find_package("zlib"))
+        target:add(find_packages("zlib", "openssl", "brew::pcre2/libpcre2-8", "conan::OpenSSL/1.0.2n@conan/stable"))
     end)
 ```
 
@@ -265,7 +270,7 @@ Some projects using xmake:
 * [tbox](https://github.com/tboox/tbox)
 * [gbox](https://github.com/tboox/gbox)
 * [vm86](https://github.com/tboox/vm86)
-* [more](https://github.com/tboox/awesome-xmake)
+* [more](https://github.com/xmake-io/awesome-xmake)
 
 ## Example Video
 
@@ -276,18 +281,19 @@ Some projects using xmake:
 ## Contacts
 
 * Email：[waruqi@gmail.com](mailto:waruqi@gmail.com)
-* Homepage：[tboox.org](http://www.tboox.org)
+* Homepage：[tboox.org](https://tboox.org)
 * Community：[/r/tboox on reddit](https://www.reddit.com/r/tboox/)
 * ChatRoom：[Char on telegram](https://t.me/tbooxorg), [Chat on gitter](https://gitter.im/tboox/tboox?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
-* Source Code：[Github](https://github.com/tboox/xmake), [Gitee](https://gitee.com/tboox/xmake)
+* Source Code：[Github](https://github.com/xmake-io/xmake), [Gitee](https://gitee.com/tboox/xmake)
 
 ## Thanks
 
 This project exists thanks to all the people who have [contributed](CONTRIBUTING.md):
-<a href="https://github.com/tboox/xmake/graphs/contributors"><img src="https://opencollective.com/xmake/contributors.svg?width=890&button=false" /></a>
+<a href="https://github.com/xmake-io/xmake/graphs/contributors"><img src="https://opencollective.com/xmake/contributors.svg?width=890&button=false" /></a>
 
 * [TitanSnow](https://github.com/TitanSnow): provide the xmake [logo](https://github.com/TitanSnow/ts-xmake-logo) and install scripts
 * [uael](https://github.com/uael): provide the semantic versioning library [sv](https://github.com/uael/sv)
+* [OpportunityLiu](https://github.com/OpportunityLiu): improve cuda, tests and ci
 
 ## Backers
 
