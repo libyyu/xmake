@@ -213,14 +213,14 @@ function _make_ldflags(targetinfo, vcxprojdir, vcxprojfile)
         end
     end
 
-    -- make RandomizedBaseAddress: inherit
-    if not has_dataexeprevention then
-        vcxprojfile:print("<DataExecutionPrevention></DataExecutionPrevention>")
-    end
+    -- -- make RandomizedBaseAddress: inherit
+    -- if not has_dataexeprevention then
+    --     vcxprojfile:print("<DataExecutionPrevention></DataExecutionPrevention>")
+    -- end
 
-    if not has_linktimecodegeneration then
-        vcxprojfile:print("<LinkTimeCodeGeneration>%s</LinkTimeCodeGeneration>", "false")
-    end
+    -- if not has_linktimecodegeneration then
+    --     vcxprojfile:print("<LinkTimeCodeGeneration>%s</LinkTimeCodeGeneration>", "false")
+    -- end
 end
 
 -- make header
