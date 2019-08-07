@@ -93,9 +93,9 @@ function _make_compcmd(compargv, sourcefile, objectfile, vcxprojdir)
         -- -Idir or /Idir
         v = v:gsub("([%-/]I)(.*)", function (I, dir)
                 dir = path.translate(dir:trim())
-                if not path.is_absolute(dir) then
+                --if not path.is_absolute(dir) then
                     dir = path.relative(path.absolute(dir), vcxprojdir)
-                end
+                --end
                 return I .. dir
             end)
         table.insert(argv, v)
@@ -113,18 +113,19 @@ function _make_compflags(sourcefile, targetinfo, vcxprojdir)
         -- -Idir or /Idir
         flag = flag:gsub("[%-/]I(.*)", function (dir)
                         dir = path.translate(dir:trim())
-                        if not path.is_absolute(dir) then
+                        --if not path.is_absolute(dir) then
                             dir = path.relative(path.absolute(dir), vcxprojdir)
-                        end
+                        --end
                         return "/I" .. dir
                     end)
 
         -- -Fdsymbol.pdb or /Fdsymbol.pdb
         flag = flag:gsub("[%-/]Fd(.*)", function (dir)
                         dir = path.translate(dir:trim())
-                        if not path.is_absolute(dir) then
+                        --if not path.is_absolute(dir) then
                             dir = path.relative(path.absolute(dir), vcxprojdir)
-                        end
+                        --end
+                        dir = path.relative(dir, vcxprojdir)
                         return "/Fd" .. dir
                     end)
 
@@ -150,19 +151,18 @@ function _make_linkflags(targetinfo, vcxprojdir)
         -- replace -libpath:dir or /libpath:dir
         flag = flag:gsub(string.ipattern("[%-/]libpath:(.*)"), function (dir)
                             dir = path.translate(dir:trim())
-                            if not path.is_absolute(dir) then
+                            --if not path.is_absolute(dir) then
                                 dir = path.relative(path.absolute(dir), vcxprojdir)
-                            end
-                            dir = path.relative(dir, vcxprojdir)
+                            --end
                             return "/libpath:"..dir
                         end)
 
         -- replace -def:dir or /def:dir
         flag = flag:gsub(string.ipattern("[%-/]def:(.*)"), function (dir)
                         dir = path.translate(dir:trim())
-                        if not path.is_absolute(dir) then
+                        --if not path.is_absolute(dir) then
                             dir = path.relative(path.absolute(dir), vcxprojdir)
-                        end
+                        --end
                         return "/def:" .. dir
                     end)
 
@@ -617,7 +617,7 @@ function _make_common_item(vcxprojfile, vsinfo, target, targetinfo, vcxprojdir)
                 not flag_lower:find("[%-/]nxcompat:(.*)") then 
                     if not default_libs[flag_lower] and flag_lower:find("(.*).lib") then
                         table.insert(lib_files, flag)
-                    else
+                    elseif not default_libs[flag_lower] then
                         table.insert(flags, flag)
                     end
             end
