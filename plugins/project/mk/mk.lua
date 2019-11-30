@@ -74,25 +74,61 @@ function _make_targetinfo(mode, arch, target)
     -- save compiler flags
     targetinfo.compflags = {}
     for _, sourcefile in ipairs(target:sourcefiles()) do
-        local _, compflags = compiler.compflags(sourcefile, target)
+        local compflags = compiler.compflags(sourcefile, {target = target})
         targetinfo.compflags[sourcefile] = compflags
     end
 
     -- links
+    local link_map = {}
     targetinfo.links = {}
     for _, v in ipairs( target:get("links") ) do
         table.insert(targetinfo.links, v)
+        link_map[v] = true
     end
 
     -- save linker flags
-    local _, linkflags = linker.linkflags(target)
+    local _, linkflags = target:linkflags()
     targetinfo.linkflags = linkflags
 
     -- linkdirs
-    targetinfo.linkdirs = table.copy(target:get("linkdirs"))
+    local linkdir_map = {}
+    targetinfo.linkdirs = {}
+    for _, v in ipairs( target:get("linkdirs") ) do
+        table.insert(targetinfo.linkdirs, v)
+        linkdir_map[v] = true
+    end
 
     -- deps
-    targetinfo.deps = table.copy(target:get("deps"))
+    targetinfo.deps = {}
+    local deps_map = {}
+    for _, v in ipairs(table.copy(target:get("deps"))) do
+        table.insert(targetinfo.deps, v)
+        local dep = project.target(v)
+        deps_map[path.basename(dep:targetfile()):sub(4,-1)] = true
+    end
+    
+
+    local linkflags = linker.linkflags(target:targetkind(), target:sourcekinds(), {target = target})
+    targetinfo.linkflags = linkflags
+
+
+    for _, flag in ipairs(targetinfo.linkflags) do
+        -- replace -libpath:dir or /libpath:dir
+        if flag:startswith("-l") then
+            local v = flag:sub(3,-1)
+            if not link_map[v] then
+                table.insert(targetinfo.links, v)
+                link_map[v] = true
+            end
+        end
+        if flag:startswith("-L") then
+            local dir = flag:sub(3,-1)
+            if not linkdir_map[dir] then
+                table.insert(targetinfo.linkdirs, dir)
+                linkdir_map[dir] = true
+            end
+        end
+    end
     
     -- ldflags
     targetinfo.ldflags = table.copy(target:get("ldflags"))
@@ -138,11 +174,15 @@ function _make_prebuilt_links(mkfile, target, archs)
     local function _is_dep(link, deps)
         for i, dep in ipairs( deps ) do
             local dep_target = project.target(dep)
-            if dep_target and dep_target:get("kind") == "static" then
+            if dep_target then
                 local basename = dep_target:basename()             
                 local name = dep_target:name()
                 basename = basename == nil and name or basename
                 if basename == link then
+                    return true
+                end
+
+                if _is_dep(link, dep_target:get("deps")) then
                     return true
                 end
             end
@@ -158,22 +198,57 @@ function _make_prebuilt_links(mkfile, target, archs)
         end
         return link
     end
+
+    local filterlib = {
+        ['android'] = true,
+        ['log'] = true,
+        ['c++_static'] = true,
+        ['c++abi'] = true,
+        ['jnigraphics'] = true,
+    }
     
-    local function _make_inner(targetinfo, _arch)
+    local function _make_inner(target, targetinfo, _arch, mode)
         local arch = toolchains_archs[_arch]
         for i, linkname in ipairs( targetinfo.links ) do
-            if _is_dep(linkname, targetinfo.deps) then 
-                mkfile:print("\tLOCAL_MODULE        := %s", linkname)
-                mkfile:print("\tLOCAL_SRC_FILES     := %$(LOCAL_PATH)/../%s/obj/local/%s/lib%s.a", linkname, arch, linkname)
-                mkfile:print("\tTHIRD_MODULS        %s= %$(LOCAL_MODULE)", i == 1 and ":" or "+")
-                mkfile:print("\tinclude %$(PREBUILT_STATIC_LIBRARY)")
+            if not filterlib[linkname] then
+                local v = mode:sub(1, 1)
+                local vmode = mode=="debug" and v:upper() .. mode:sub(2, -1) or ""
+                if _is_dep(linkname, targetinfo.deps) then 
+                    mkfile:print("\tinclude %$(CLEAR_VARS)")
+                    mkfile:print("\tLOCAL_MODULE        := %s", linkname..vmode)
+                    mkfile:print("\tLOCAL_SRC_FILES     := %$(LOCAL_PATH)/../%s/obj/local/%s/lib%s.a", linkname, arch, linkname..vmode)
+                    mkfile:print("\tTHIRD_MODULS        %s= %$(LOCAL_MODULE)", i==1 and ":" or "+")
+                    mkfile:print("\tinclude %$(PREBUILT_STATIC_LIBRARY)")
+                else
+                    local linkfile = _get_link("lib"..linkname..".a", targetinfo.linkdirs)
+                    local rpath = path.relative(linkfile, target.mkfiledir)
+                    mkfile:print("\tinclude %$(CLEAR_VARS)")
+                    mkfile:print("\tLOCAL_MODULE        := %s", linkname)
+                    mkfile:print("\tLOCAL_SRC_FILES     := %$(LOCAL_PATH)/%s", rpath:gsub("\\", "/"):trim())
+                    mkfile:print("\tTHIRD_MODULS        %s= %$(LOCAL_MODULE)", begin and ":" or "+")
+                    mkfile:print("\tinclude %$(PREBUILT_STATIC_LIBRARY)")
+                end
+            end
+        end
+    end
+
+    local function _make_mode(ibegin, iend, mode, mkfile)
+        for i, _arch in ipairs( archs ) do        
+            if i==1 and ibegin then
+                mkfile:print("ifeq (%$(APP_OPTIM)_%$(TARGET_ARCH_ABI),%s_%s)", mode, toolchains_archs[_arch])
+                local targetinfo = _get_targetinfo(mode, _arch, target.info)
+                if targetinfo then
+                    _make_inner(target, targetinfo, _arch, mode)
+                end
             else
-                local linkfile = _get_link("lib"..linkname..".a", targetinfo.linkdirs)
-                local rpath = path.relative(linkfile, target.mkfiledir)
-                mkfile:print("\tLOCAL_MODULE        := %s", linkname)
-                mkfile:print("\tLOCAL_SRC_FILES     := %$(LOCAL_PATH)/%s", rpath:gsub("\\", "/"):trim())
-                mkfile:print("\tTHIRD_MODULS        %s= %$(LOCAL_MODULE)", i == 1 and ":" or "+")
-                mkfile:print("\tinclude %$(PREBUILT_STATIC_LIBRARY)")
+                mkfile:print("else ifeq (%$(APP_OPTIM)_%$(TARGET_ARCH_ABI),%s_%s)", mode, toolchains_archs[_arch])
+                local targetinfo = _get_targetinfo(mode, _arch, target.info)
+                if targetinfo then
+                    _make_inner(target, targetinfo, _arch, mode)
+                end
+                if i == #archs and iend then
+                    mkfile:print("endif")
+                end
             end
         end
     end
@@ -181,29 +256,21 @@ function _make_prebuilt_links(mkfile, target, archs)
     mkfile:print("")
     mkfile:print("# preinclude static libs")
 
-    for i, _arch in ipairs( archs ) do        
-        if i == 1 then
-            mkfile:print("ifeq (%$(TARGET_ARCH_ABI),%s)", toolchains_archs[_arch])
-            local targetinfo = _get_targetinfo("release", _arch, target.info)
-            if targetinfo then
-                _make_inner(targetinfo, _arch)
-            end
-        else
-            mkfile:print("else ifeq (%$(TARGET_ARCH_ABI),%s)", toolchains_archs[_arch])
-            local targetinfo = _get_targetinfo("release", _arch, target.info)
-            if targetinfo then
-                _make_inner(targetinfo, _arch)
-            end
-            if i == #archs then
-                mkfile:print("endif")
-            end
-        end
+    for i, v in ipairs({'release', 'debug'}) do
+        _make_mode(i == 1, i == 2, v, mkfile)
     end
+
     mkfile:print("")
     mkfile:print("include %$(CLEAR_VARS)")
 end
 
 function _make_flags(mkfile, targetinfo)
+    --LOCAL_ARM_MODE
+    local local_arm_mode = config.get("LOCAL_ARM_MODE")
+    if local_arm_mode and type(local_arm_mode) == "string" and #local_arm_mode > 0 then
+        mkfile:print("LOCAL_ARM_MODE := %s", local_arm_mode)
+    end
+
     mkfile:print("")
     mkfile:print("# flags")
     mkfile:print("LOCAL_CPP_FEATURES := rtti exceptions")
@@ -333,26 +400,31 @@ end
 function _make_tailer(mkfile, target, archs)
     mkfile:print("")
     mkfile:print("# tailer")
-    --if target.kind ~= "static" then
+    if target.kind ~= "static" then
         mkfile:print("LOCAL_SHARED_LIBARIES :=\\")
         mkfile:print("libcutils \\")
         mkfile:print("libdl")
-    --end
-    mkfile:print("")
-  
-    if target.kind ~= "static" then
-        --mkfile:print("LOCAL_LDLIBS += -landroid -llog")
-        --_make_ldlibs(mkfile, target, archs)
-        mkfile:print("LOCAL_STATIC_LIBRARIES := %$(THIRD_MODULS)")
-        mkfile:print("LOCAL_LDLIBS += -landroid -llog -ljnigraphics")
-        mkfile:print("LOCAL_EXPORT_LDFLAGS += --whole-archive")
+        mkfile:print("")
     end
-    mkfile:print("")
+    
 
+    if target.kind ~= "static" then
+        mkfile:print("LOCAL_EXPORT_LDFLAGS += --whole-archive")
+        mkfile:print("#LOCAL_STATIC_LIBRARIES := %$(THIRD_MODULS)")    
+        mkfile:print("LOCAL_WHOLE_STATIC_LIBRARIES := %$(THIRD_MODULS)")    
+        mkfile:print("LOCAL_LDLIBS += -landroid -llog -ljnigraphics")     
+        mkfile:print("")
+    end
+    
+    mkfile:print("#cmd-strip = $(ndk)/arm-linux-androideabi-4.8/prebuild/strip -s --strip-debug -x $1")
+    mkfile:print("")
     mkfile:print("ifeq (%$(APP_OPTIM),release)")
     mkfile:print("\tLOCAL_MODULE  := %s", target.name)
     mkfile:print("else")
     mkfile:print("\tLOCAL_MODULE  := %s", target.name.."Debug")
+    if target.name:startswith("Azure") then
+        mkfile:print("\tLOCAL_CFLAGS    += -D AZURE_DEBUG")
+    end
     mkfile:print("endif")
 
     if target.kind == "static" then
@@ -363,11 +435,11 @@ function _make_tailer(mkfile, target, archs)
     end
 end
 
-function _make_application(appfile, mkinfo)
+function _make_application(appfile, target, mkinfo, mode)
     appfile:print("# AUTO GENERATOR BY XMAKE, DO'NOT MODIFY.")
     appfile:print("APP_PROJECT_PATH := %s", ".")
-     -- mode
-    appfile:print("APP_OPTIM := %s", table.concat( mkinfo.modes, " "):trim())
+    -- mode
+    appfile:print("APP_OPTIM := %s", mode)
 
     -- abi
     local abi = {}
@@ -382,16 +454,21 @@ function _make_application(appfile, mkinfo)
 
     --APP_PLATFORM
     local ndk_sdkver = config.get("ndk_sdkver")
-    if not ndk_sdkver or #ndk_sdkver == 0 then
-        ndk_sdkver = "14"
+    if not ndk_sdkver then
+        ndk_sdkver = 14
+    elseif type(ndk_sdkver) == "number" then
+        ndk_sdkver = tonumber(ndk_sdkver) or 14
+    else
+        ndk_sdkver = 14
     end
-    appfile:print("APP_PLATFORM := %s", "android-" .. ndk_sdkver)
+    appfile:print("APP_PLATFORM := %s", "android-" .. tostring(ndk_sdkver))
 
     --APP_BUILD_SCRIPT
     appfile:print("APP_BUILD_SCRIPT := %s", "Android.mk")
 
     --APP_STL
-    appfile:print("APP_STL := %s", "gnustl_static")
+    --appfile:print("APP_STL := %s", "gnustl_static")
+    appfile:print("APP_STL := %s", "c++_static")
 
     --NDK_TOOLCHAIN_VERSION
     local ndk_toolchainver = config.get("NDK_TOOLCHAIN_VERSION")
@@ -399,11 +476,57 @@ function _make_application(appfile, mkinfo)
         appfile:print("NDK_TOOLCHAIN_VERSION := %s", ndk_toolchainver)
     end
 
-    --APP_USE_CPP0X
-    --appfile:print("APP_USE_CPP0X := %s", "true")
-
     --APP_CPPFLAGS
-    --_make_variables(appfile, "APP_CPPFLAGS", "true")
+    appfile:print("APP_CPPFLAGS += %s", "-fexceptions")
+
+    --APP_USE_CPP0X
+    local cxxox = false
+    for _, v in ipairs( target.info[1].languages ) do
+        if v:find("xx") then
+            cxxox = true
+            break
+        end
+    end
+    if cxxox then
+        appfile:print("APP_USE_CPP0X := %s", "true")
+    end
+end
+
+function _make_application_raw(target, mkinfo, target_dir)
+    local results = {}
+    for _, mode in ipairs(mkinfo.modes) do
+        local v = mode:sub(1, 1)
+        local vmode = v:upper() .. mode:sub(2, -1)
+        local tmpfile = os.tmpfile() .. ".mk"
+        local tmpappfile = io.open(tmpfile, "w")
+        _make_application(tmpappfile, target, mkinfo, mode)
+        tmpappfile:close()
+
+        local newcontents = nil
+        local oldcontents = nil
+        local tmpappfile = io.open(tmpfile, "r")
+        newcontents = tmpappfile:read("*all")
+        tmpappfile:close()
+
+        local appfilename = "Application"..vmode .. ".mk"
+        local apppath = path.join(target_dir, appfilename)
+        if os.isfile(apppath) then
+            local tmpappfile = io.open(apppath, "r")
+            oldcontents = tmpappfile:read("*all")
+            tmpappfile:close()
+        end
+
+        if oldcontents ~= newcontents then
+            os.cp(tmpfile, apppath)
+            print("\t"..appfilename .. " is changed!")
+        end
+        if os.exists(tmpfile) then
+            os.rm(tmpfile)
+        end
+
+        results[#results+1] = appfilename
+    end
+    return results
 end
 
 function _make_target(mkfile, target, archs)
@@ -427,9 +550,16 @@ function _make_target(mkfile, target, archs)
     _make_tailer(mkfile, target, archs)
 end
 
-function _make_target_gen(target_dir, target)
+function _make_target_gen(target_dir, target, appfilename, genbats, genbashs)
+    -- j8
+    local j8
+    if config.get("j8"..target.name) == true then
+        j8 = true
+    end
+
     do
-        local genbatfile = io.open(path.join(target_dir, "gen.bat"), "w")
+        local filename = "gen" .. path.basename(appfilename) .. ".bat"
+        local genbatfile = io.open(path.join(target_dir, filename), "w")
         genbatfile:print(":: AUTO GENERATOR BY XMAKE, DO'NOT MODIFY.")
 
         genbatfile:print("@echo off")
@@ -437,7 +567,11 @@ function _make_target_gen(target_dir, target)
 
         genbatfile:print("@rem gen %s", target.name)
         genbatfile:print("@echo Compiling NativeCode... %s", target.name)
-        genbatfile:print("\"%NDK_HOME%\\ndk-build.cmd\" NDK_PROJECT_PATH=. NDK_APPLICATION_MK=Application.mk")
+        if j8 then
+            genbatfile:print("\"%NDK_HOME%\\ndk-build.cmd\" -j8 NDK_PROJECT_PATH=. NDK_APPLICATION_MK="..appfilename)
+        else 
+            genbatfile:print("\"%NDK_HOME%\\ndk-build.cmd\" NDK_PROJECT_PATH=. NDK_APPLICATION_MK="..appfilename)
+        end
         genbatfile:print("@if errorlevel 1 goto :BAD")
         genbatfile:print("goto :SUCCESS")
         genbatfile:print("")
@@ -465,9 +599,12 @@ function _make_target_gen(target_dir, target)
         genbatfile:print("exit /B 0")
 
         genbatfile:close()
+
+        genbats[#genbats+1] = filename
     end
     do
-        local genbashfile = io.open(path.join(target_dir, "gen.sh"), "w")
+        local filename = "gen" .. path.basename(appfilename) .. ".sh"
+        local genbashfile = io.open(path.join(target_dir, filename), "w")
         genbashfile:print("## AUTO GENERATOR BY XMAKE, DO'NOT MODIFY.")
 
         genbashfile:print("if [ ! \"$NDK_HOME\" ]; then")
@@ -476,10 +613,52 @@ function _make_target_gen(target_dir, target)
         genbashfile:print("fi")
         genbashfile:print("# gen %s", target.name)
         genbashfile:print("echo \"Compiling NativeCode... %s\"", target.name)
-        genbashfile:print("%$NDK_HOME/ndk-build NDK_PROJECT_PATH=. NDK_APPLICATION_MK=Application.mk $* || { echo \"Build [%s] Error!\"; exit 1; }", target.name)
+        if j8 then
+            genbashfile:print("if [ \"`uname -s`\" = \"Darwin\" ]; then")
+            genbashfile:print("\t%$NDK_HOME/ndk-build -j8 NDK_PROJECT_PATH=. NDK_APPLICATION_MK=%s $* || { echo \"Build [%s] Error!\"; exit 1; }", appfilename, target.name)
+            genbashfile:print("else")
+            genbashfile:print("\t%$NDK_HOME/ndk-build.cmd -j8 NDK_PROJECT_PATH=. NDK_APPLICATION_MK=%s $* || { echo \"Build [%s] Error!\"; exit 1; }", appfilename, target.name)
+            genbashfile:print("fi")
+        else
+            genbashfile:print("if [ \"`uname -s`\" = \"Darwin\" ]; then")
+            genbashfile:print("\t%$NDK_HOME/ndk-build NDK_PROJECT_PATH=. NDK_APPLICATION_MK=%s $* || { echo \"Build [%s] Error!\"; exit 1; }", appfilename, target.name)
+            genbashfile:print("else")
+            genbashfile:print("\t%$NDK_HOME/ndk-build.cmd NDK_PROJECT_PATH=. NDK_APPLICATION_MK=%s $* || { echo \"Build [%s] Error!\"; exit 1; }", appfilename, target.name)
+            genbashfile:print("fi")
+        end
         genbashfile:print("echo \"Build [%s] Done!\"", target.name)
         genbashfile:print("exit 0")
         genbashfile:close()
+
+        genbashs[#genbashs+1] = filename
+    end
+end
+
+function _make_target_raw(target, mkinfo, target_dir)
+    local tmpfile = os.tmpfile() .. ".mk"
+    local tmpappfile = io.open(tmpfile, "w")
+    _make_target(tmpappfile, target, mkinfo.archs)
+    -- close file
+    tmpappfile:close()
+
+    local newcontents = nil
+    local oldcontents = nil
+    local tmpappfile = io.open(tmpfile, "r")
+    newcontents = tmpappfile:read("*all")
+    tmpappfile:close()
+
+    local mkpath = path.join(target_dir, "Android.mk")
+    if os.isfile(mkpath) then
+        local tmpmkfile = io.open(mkpath, "r")
+        oldcontents = tmpmkfile:read("*all")
+        tmpmkfile:close()
+    end
+    if oldcontents ~= newcontents then
+        os.cp(tmpfile, mkpath)
+        print("\tAndroid.mk is changed!")
+    end
+    if os.exists(tmpfile) then
+        os.rm(tmpfile)
     end
 end
 
@@ -517,6 +696,7 @@ function _make_all(mkinfo)
     end
 
     -- make all
+    -- whether tb is ta's dep target
     local function _is_dep(ta, tb)
         for _, targetinfo in ipairs( ta.info ) do
             for _, v in pairs( targetinfo.deps ) do
@@ -527,19 +707,60 @@ function _make_all(mkinfo)
         end
         return false
     end
+    local function _is_dep_to_all(ta, list)
+        for _, v in ipairs(list) do
+            if ta ~= v then
+                if _is_dep(v, ta) then
+                    return true
+                end
+            end
+        end
+        return false
+    end
     local sorttargets = {}
     for _, target in pairs(mkinfo.targets) do
         sorttargets[#sorttargets+1] = target
-    end    
+    end 
     table.sort(sorttargets, function(ta, tb)
-        if _is_dep(ta, tb) then
-            return false
-        elseif _is_dep(tb, ta) then
+        local a = _is_dep_to_all(ta, sorttargets)
+        local b = _is_dep_to_all(tb, sorttargets)
+        if a ~= b then
+            return a
+        elseif _is_dep(ta, tb) then 
             return true
         else
             return false
         end
     end)
+
+    for i=1, #sorttargets-1 do
+        for j=#sorttargets, i+1, -1 do
+            local ta = sorttargets[j-1]
+            local tb = sorttargets[j]
+            if _is_dep(ta, tb) then 
+                sorttargets[j-1] = tb
+                sorttargets[j] = ta
+            end
+        end
+    end
+
+    local function genbatfile_call(f, target, batfilename)
+        f:print("@echo gen %s -- %s", target.name, path.basename(batfilename))
+        f:print("cd %s", target.name)
+        f:print("call " .. batfilename)
+        f:print("@if errorlevel 1 goto :BAD")
+        f:print("cd ..")
+        f:print("")
+        f:print("")
+    end
+    local function genbashfile_call(f, target, bashfilename)
+        f:print("echo \"gen %s -- %s\"", target.name, path.basename(bashfilename))
+        f:print("cd %s", target.name)
+        f:print("sh ".. bashfilename .. " || { echo \"Build Error!\"; exit 1; }")
+        f:print("cd ..")
+        f:print("")
+        f:print("")
+    end
 
     for _, target in ipairs( sorttargets ) do
         if target.kind ~= "binary" then
@@ -547,35 +768,29 @@ function _make_all(mkinfo)
             local target_dir = path.join(mkinfo.outputdir, target.name)
 
             -- make application.mk
-            local appfile = io.open(path.join(target_dir, "Application.mk"), "w")
-            _make_application(appfile, mkinfo)
-            -- close file
-            appfile:close()
+            local appfilenames = _make_application_raw(target, mkinfo, target_dir)
 
             -- make android.mk
-            local mkfile = io.open(path.join(target_dir, "Android.mk"), "w")
-            _make_target(mkfile, target, mkinfo.archs)
-            -- close the mkfile
-            mkfile:close()
-
-            -- make android.mk
-            _make_target_gen(target_dir, target)
             do
-                genallbatfile:print("@echo gen %s", target.name)
-                genallbatfile:print("cd %s", target.name)
-                genallbatfile:print("call gen.bat")
-                genallbatfile:print("@if errorlevel 1 goto :BAD")
-                genallbatfile:print("cd ..")
-                genallbatfile:print("")
-                genallbatfile:print("")
+                _make_target_raw(target, mkinfo, target_dir)
+            end
+
+            -- make target gen
+            local genbats = {}
+            local genbashs = {}
+            for _, v in ipairs(appfilenames) do
+                _make_target_gen(target_dir, target, v, genbats, genbashs)    
+            end
+            
+            do
+                for _, v in ipairs(genbats) do
+                    genbatfile_call(genallbatfile, target, v)
+                end
             end
             do
-                genallbashfile:print("echo \"gen %s\"", target.name)
-                genallbashfile:print("cd %s", target.name)
-                genallbashfile:print("sh gen.sh || { echo \"Build Error!\"; exit 1; }")
-                genallbashfile:print("cd ..")
-                genallbashfile:print("")
-                genallbashfile:print("")
+                for _, v in ipairs(genbashs) do
+                    genbashfile_call(genallbashfile, target, v)
+                end
             end
         end
     end
@@ -668,17 +883,19 @@ function make(outputdir)
             if mode ~= config.mode() or arch ~= config.arch() then
                 
                 -- modify config
-                config.set("mode", mode)
-                config.set("arch", arch)
+                config.set("mode", mode, {force=true})
+                config.set("arch", arch, {force=true})
+
+                project.clear()
 
                 -- recheck project options
-                project.check(true)
+                project.check()
 
                 -- reload platform
                 platform.load(config.plat())
 
                 -- reload project
-                project.load()
+                --project.load()
             end
 
             -- ensure to enter project directory
@@ -686,6 +903,7 @@ function make(outputdir)
 
             -- save targets
             for targetname, target in pairs(project.targets()) do
+                print("checking for the %s.%s.%s.%s ... %s", targetname, mode, arch, target:get("kind"), target:targetfile())
                 -- make target with the given mode and arch
                 targets[targetname] = targets[targetname] or {}
                 local _target = targets[targetname]
@@ -698,6 +916,7 @@ function make(outputdir)
                 _target.target = target
                 _target.mkfiledir = path.join(mkinfo.outputdir, targetname)
                 _target.projectdir = target:get("projectdir")
+
                 table.insert(_target.info, _make_targetinfo(mode, arch, target))
 
                 -- save all sourcefiles and headerfiles

@@ -34,6 +34,18 @@ end
 
 --
 function _objectsTostring(objects, indent)
+	local function _is_array(t)
+		if t and #t >0 then
+			for i,v in ipairs(t) do
+				if type(v) ~= "table" then
+					return false 
+				end
+			end
+			return true
+		else
+			return false
+		end
+	end
 	local function _is_dict(t)
 		local empty = true
 		for k, v in pairs( t ) do
@@ -63,13 +75,18 @@ function _objectsTostring(objects, indent)
 			else
 				local isdict = _is_dict(v)
 				text = text .. _strIndent(indent)
-				text = text .. k .. " = "
+				local sep = ";"
+				if _is_array(tab) then
+					sep = ","
+				else
+					text = text .. k .. " = "
+				end
 				text = text .. ( isdict and "{\n" or "(\n")
 				indent = indent + 1
 				_tostring(v, indent)
 				indent = indent - 1
 				text = text .. _strIndent(indent)
-				text = text .. (isdict and "};\n" or ");\n")
+				text = text .. (isdict and "}" .. sep.."\n" or ");\n")
 			end
 		end
 	end
@@ -123,7 +140,7 @@ function _make_targetinfo(mode, arch, target)
     -- deps
     targetinfo.deps = table.copy(target:get("deps"))
     --if targetinfo.targetkind == "static" then
-    	for k, v in pairs(targetinfo.deps) do
+    	--[[for k, v in pairs(targetinfo.deps) do
     		if not link_map[v] then
     			table.insert(targetinfo.links, v)
     			local dep_target = project.target(v)
@@ -132,8 +149,28 @@ function _make_targetinfo(mode, arch, target)
     				table.insert(targetinfo.linkdirs, ppath)
     			end
     		end
-    	end
+    	end]]
     --end
+
+    local linkflags = linker.linkflags(target:targetkind(), target:sourcekinds(), {target = target})
+    targetinfo.linkflags = linkflags
+    for _, flag in ipairs(targetinfo.linkflags) do
+        -- replace -libpath:dir or /libpath:dir
+        if flag:startswith("-l") then
+        	local v = flag:sub(3,-1)
+        	if not link_map[v] then
+            	table.insert(targetinfo.links, v)
+            	link_map[v] = true
+            end
+        end
+        if flag:startswith("-L") then
+        	local dir = flag:sub(3,-1)
+        	if not linkdir_map[dir] then
+            	table.insert(targetinfo.linkdirs, dir)
+            	linkdir_map[dir] = true
+            end
+        end
+    end
     
     -- ldflags
     targetinfo.ldflags = table.copy(target:get("ldflags"))
@@ -173,8 +210,8 @@ function _make_targetinfo(mode, arch, target)
 end
 
 function _convert_string(s)
-	if s:find(" ") or s:find("+") then
-		return "\"" .. s .. "\""
+	if s:find(" ") or s:find("+") or s:find("\"") then
+		return "\"" .. s:gsub("\"", "\\\"") .. "\""
 	end
 	return s
 end
@@ -188,13 +225,17 @@ function _get_targetinfo(target, mode, arch)
 	return target.info[1]
 end
 
-function _getKind(target)
-	local kind = target.kind
-	local name = target.name
+function _getKind2(kind, name)
 	if config.get(name.."Bundle") == true then
 		kind = "bundle"
 	end
 	return kind
+end
+
+function _getKind(target)
+	local kind = target.kind
+	local name = target.name
+	return _getKind2(kind, name)
 end
 
 function _getValidArchs()
@@ -214,9 +255,7 @@ function _getValidArchs()
     end
     return "\""..ret.."\""
 end
-
-function _get_MACH_O_TYPE(target)
-	local kind = _getKind(target)
+function _get_MACH_O_TYPE2(kind)
 	if kind == "static" then
 		return  "staticlib"
 	elseif kind == "shared" then
@@ -228,6 +267,10 @@ function _get_MACH_O_TYPE(target)
 	else
 		return "\"\""
 	end
+end
+function _get_MACH_O_TYPE(target)
+	local kind = _getKind(target)
+	return _get_MACH_O_TYPE2(kind)
 end
 
 function _get_EXECUTABLE_PREFIX(target)
@@ -244,9 +287,7 @@ function _get_EXECUTABLE_PREFIX(target)
 		return "\"\""
 	end
 end
-
-function _getEXECUTABLE_EXTENSION(target)
-	local kind = _getKind(target)
+function _getEXECUTABLE_EXTENSION2(kind)
 	if kind == "static" then
 		return  "a"
 	elseif kind == "shared" then
@@ -259,9 +300,11 @@ function _getEXECUTABLE_EXTENSION(target)
 		return "\"\""
 	end
 end
-
-function _get_productType(target)
+function _getEXECUTABLE_EXTENSION(target)
 	local kind = _getKind(target)
+	return _getEXECUTABLE_EXTENSION2(kind)
+end
+function _get_productType2(kind)
 	if kind == "static" then
 		return  "\"com.apple.product-type.library.static\""
 	elseif kind == "shared" then
@@ -274,8 +317,11 @@ function _get_productType(target)
 		return "\"\""
 	end
 end
-function _get_explicitFileType(target)
+function _get_productType(target)
 	local kind = _getKind(target)
+	return _get_productType2(kind)
+end
+function _get_explicitFileType2(kind)
 	if kind == "static" then
 		return "archive.ar"
 	elseif kind == "shared" then
@@ -287,6 +333,10 @@ function _get_explicitFileType(target)
 	else
 		return "\"\""
 	end
+end 
+function _get_explicitFileType(target)
+	local kind = _getKind(target)
+	return _get_explicitFileType2(kind)
 end 
 
 function _get_archs(plat, arch)
@@ -450,7 +500,7 @@ function _find(pbxinfo, _path, target)
 	return __find(pbxinfo, paths, target)
 end
 
-function _findInGroup(pbxinfo, parentGUID, name, target)
+function _findInGroup(pbxinfo, parentGUID, name)
 	local parentGroup = _getGroup(pbxinfo, parentGUID)
 	for _,child in ipairs(parentGroup.children) do
 		if pbxinfo.objects[child].name == name or pbxinfo.objects[child].path == name then
@@ -476,18 +526,22 @@ function __addGroup(pbxinfo, parentGUID, _name, _path, sourceTree, isVarGroup)
     return newguid
 end
 
-function _addGroup(pbxinfo, target, parentGUID, _path, sourceTree, isVarGroup)
-	local _tpath = _releativePath(target, _path, true)
+function _addGroupSimple(pbxinfo, _tpath, parentGUID, sourceTree, isVarGroup)
 	local paths = _tpath:split("/")
 	local preGUID = parentGUID
 	for _, v in ipairs(paths) do
-		local groupGUID = _findInGroup(pbxinfo, preGUID, v, target)
+		local groupGUID = _findInGroup(pbxinfo, preGUID, v)
 		if not groupGUID then
 			groupGUID = __addGroup(pbxinfo, preGUID, v, v, sourceTree, isVarGroup)
 		end
 		preGUID = groupGUID
 	end
 	return preGUID
+end
+
+function _addGroup(pbxinfo, target, parentGUID, _path, sourceTree, isVarGroup)
+	local _tpath = _releativePath(target, _path, true)
+	return _addGroupSimple(pbxinfo, _tpath, parentGUID, sourceTree, isVarGroup)
 end
 
 function _addBuildFilesourcesBuildPhase(pbxinfo, fileGUID)
@@ -587,6 +641,7 @@ function __addFile(pbxinfo, parentGUID, _path, no_relative, target, sourceTree, 
         [".png"] 			= "image.png",
         [".tif"] 			="image.tiff",
         [".tiff"] 			= "image.tiff",
+        [".xcodeproj"] 		= "wrapper.pb-project",
     }
     local filePhaseMapping = {
     	[".h"]				= _addBuildheaderBuildPhase,
@@ -609,6 +664,7 @@ function __addFile(pbxinfo, parentGUID, _path, no_relative, target, sourceTree, 
         [".png"] 			= _addBuildresourceBuildPhase,
         [".tif"] 			= _addBuildresourceBuildPhase,
         [".tiff"] 			= _addBuildresourceBuildPhase,
+        [".xcodeproj"] 			= _addBuildresourceBuildPhase,
     }
     local fileType = fileTypeMapping[ext] or "text"
   	local buildPhase = filePhaseMapping[ext]
@@ -616,7 +672,11 @@ function __addFile(pbxinfo, parentGUID, _path, no_relative, target, sourceTree, 
   	--PBXFileReference
 	local fileInfo = {}
     fileInfo["isa"] = "PBXFileReference"
-    fileInfo["name"] = _convert_string(path.filename(_path))
+    if fileType == ".xcodeproj" then
+    	fileInfo["name"] = _convert_string(path.basename(_path)) .. ".xcodeproj"
+    else
+    	fileInfo["name"] = _convert_string(path.filename(_path))
+    end
     fileInfo["sourceTree"] = sourceTree
     fileInfo["children"] = {}
     fileInfo["lastKnownFileType"] = fileType
@@ -652,6 +712,8 @@ function _addFramework(pbxinfo, _path, parentGUID, target, sourceTree, settings)
 	__addFile(pbxinfo, parentGUID, _path, true, target, sourceTree, settings)
 end
 
+local all_target_guid = {}
+local all_product_guid = {}
 
 function _make_pbxproj_file(pbxinfo, target)
 	--source files
@@ -685,7 +747,7 @@ function _make_pbxproj_file(pbxinfo, target)
 	    local buildConfigID = _getNativeConfigurationListID(pbxinfo)
 	    local defines = {}
 	    for _, def in ipairs( targetinfo.defines ) do
-	    	table.insert(defines, "\"" .. def .. "\"")
+	    	table.insert(defines, "\""..def:gsub("\"", "\\\"").."\"")
 	    end
 	    for _, buildID in ipairs(objects[buildConfigID].buildConfigurations) do
 	    	objects[buildID].buildSettings = objects[buildID].buildSettings or {}
@@ -729,6 +791,22 @@ function _make_pbxproj_file(pbxinfo, target)
 	        return false
 	    end
 
+	    local function _is_target_dep(link, target)
+	    	if not target then return false end
+    		local ret, dep_target = _is_dep(link, target:get("deps"))
+    		if ret then
+    			return true, dep_target
+    		else
+    			for i, dep in ipairs( target:get("deps") ) do
+    				local dep_target = project.target(dep)
+	            	if dep_target then
+	            		return _is_target_dep(link, dep_target)
+	            	end
+	            end
+    		end
+    		return false
+    	end
+
 	    local function _find_lib(name)
 	    	if not name:find("/") then
 	    		local libname = name
@@ -771,7 +849,7 @@ function _make_pbxproj_file(pbxinfo, target)
 	    local links = {}
 	    local frameworkGroupGUID = _addGroup(pbxinfo, target, nil, "Frameworks")
 	    for _, linkname in ipairs(targetinfo.links) do
-	    	local ret, dep_target = _is_dep(linkname, targetinfo.deps)
+	    	local ret, dep_target = _is_target_dep(linkname, target.target)
 	    	if ret then 
 	    		_addFile2(pbxinfo, "libs", dep_target:targetfile(), target, SourceTree.ROOT)
 	    	else
@@ -873,11 +951,100 @@ function _make_pbxproj_file(pbxinfo, target)
 	end
 end
 
+function _make_pbxproj_dep(pbxinfo, target, d, dep_target)
+	local rootGUID = pbxinfo.rootObjectGUID
+	local objects = pbxinfo.objects
+	local depname = dep_target:name()
+	do
+		--deps Group 
+		local depGroupId = _addGroupSimple(pbxinfo, "deps", nil, SourceTree.GROUP, false)
+		--Products
+		local id = d["ProductGroup"]
+		local Products = {}
+		Products["isa"] = "PBXGroup"
+		Products["name"] = "Products"
+		Products["sourceTree"] = SourceTree.GROUP
+		local childid = _guid()
+		Products["children"] = {
+			childid,
+		}
+		objects[id] = Products
+
+		--PBXReferenceProxy
+		local PBXReferenceProxy = {}
+		PBXReferenceProxy["isa"] = "PBXReferenceProxy"
+		PBXReferenceProxy["fileType"] = _get_explicitFileType2(dep_target:get("kind")) --"archive.ar"
+		local kind = _getKind2(dep_target:get("kind"), depname)
+		if kind == "bundle" then
+			local b = depname
+			PBXReferenceProxy["path"] = b .. ".bundle"
+		else
+			PBXReferenceProxy["path"] = path.filename(dep_target:targetfile())
+		end
+
+		PBXReferenceProxy["sourceTree"] = SourceTree.BUILT_PRODUCTS_DIR
+		PBXReferenceProxy["remoteRef"] = _guid()
+		objects[childid] = PBXReferenceProxy
+		--PBXContainerItemProxy2
+		local deptargetId = all_target_guid[depname]
+		if not deptargetId then
+			all_target_guid[depname] = _guid()
+			deptargetId = all_target_guid[depname]
+		end
+		local deptargetProductId = all_product_guid[depname]
+		if not deptargetProductId then
+			all_product_guid[depname] = _guid()
+			deptargetProductId = all_product_guid[depname]
+		end
+
+		local containerPortalId = d["ProjectRef"]
+		local childid2 = PBXReferenceProxy["remoteRef"]
+		local PBXContainerItemProxy2 = {}
+		objects[childid2] = PBXContainerItemProxy2
+		PBXContainerItemProxy2['isa'] = "PBXContainerItemProxy"
+		PBXContainerItemProxy2['proxyType'] = 2
+		PBXContainerItemProxy2['remoteInfo'] = depname
+		PBXContainerItemProxy2['containerPortal'] = containerPortalId
+		PBXContainerItemProxy2['remoteGlobalIDString'] = deptargetProductId
+		--Project
+		local fileref = {}
+		fileref["isa"] = "PBXFileReference"
+		fileref["lastKnownFileType"] = "\"wrapper.pb-project\""
+		fileref["name"] = depname .. ".xcodeproj"
+		local depxcodeproj = path.join(target.outputdir, depname.."/"..depname..".xcodeproj")
+		fileref["path"] = _releativePath(target, depxcodeproj, false)
+		fileref["sourceTree"] = SourceTree.GROUP
+		objects[containerPortalId] = fileref
+		table.insert(objects[depGroupId].children, containerPortalId)
+
+		--PBXTargetDependency
+		local targetdepid = _guid()
+		local PBXTargetDependency = {}
+		objects[targetdepid] = PBXTargetDependency
+		PBXTargetDependency["isa"] = "PBXTargetDependency"
+		PBXTargetDependency["name"] = depname
+		PBXTargetDependency["targetProxy"] = _guid()
+		--PBXContainerItemProxy
+		local childid1 = PBXTargetDependency["targetProxy"]
+		local PBXContainerItemProxy = {}
+		objects[childid1] = PBXContainerItemProxy
+		PBXContainerItemProxy['isa'] = "PBXContainerItemProxy"
+		PBXContainerItemProxy['proxyType'] = 1
+		PBXContainerItemProxy['remoteInfo'] = depname
+		PBXContainerItemProxy['containerPortal'] = containerPortalId
+		PBXContainerItemProxy['remoteGlobalIDString'] = deptargetId
+
+		return targetdepid
+	end
+end
+
 function _make_objects(pbxinfo, target)
 	local rootGUID = pbxinfo.rootObjectGUID
 	local objects = pbxinfo.objects
-	local targetid = _guid()
+	local targetid = all_target_guid[target.name] or _guid()
+	all_target_guid[target.name] = targetid
 	objects[rootGUID] = {}
+	local projectReferences
 	do--PBXProject
 		local PBXProject = objects[rootGUID]
 		PBXProject["isa"] = "PBXProject"
@@ -1074,7 +1241,8 @@ function _make_objects(pbxinfo, target)
 		objects[targetid].buildConfigurationList = buildConfigurationListGUID
 	end
 	do --productReference
-		local productReferenceGUID = _guid()
+		local productReferenceGUID = all_product_guid[target.name] or _guid()
+		all_product_guid[target.name] = productReferenceGUID
 		local productReference = {}
 		productReference["isa"] = "PBXFileReference"
 		productReference["explicitFileType"] = _get_explicitFileType(target) --"archive.ar"
@@ -1211,6 +1379,21 @@ function _make_objects(pbxinfo, target)
 
 	_make_pbxproj_file(pbxinfo, target)
 
+	local deps = target.target:orderdeps()
+	if deps and #deps >0 then
+		local PBXProject = objects[rootGUID]
+		projectReferences = {}
+		PBXProject["projectReferences"] = projectReferences
+		for _, dep in ipairs(deps) do
+			local d = {}
+			d["ProductGroup"] = _guid()
+			d["ProjectRef"] = _guid()
+			projectReferences[#projectReferences+1] = d
+			local targetdepid = _make_pbxproj_dep(pbxinfo, target, d, dep)
+			table.insert(objects[targetid]["dependencies"], targetdepid)
+		end
+	end
+
 	--table.dump(objects)
 	return _objectsTostring(objects, 2)
 end
@@ -1275,8 +1458,11 @@ function _make_all(pbxinfo)
     for _, target in ipairs( sorttargets ) do
         print("gen ["..target.name.."] for " .. target.plat)
         local target_dir = path.join(target.outputdir, target.name)
+        local xcode_file = path.join(target_dir, target.name..".xcodeproj")
+        target.xcode_file = xcode_file
+        target.xcode_dir = target_dir
         _make_sourcefolder(path.join(target_dir, target.name), target)
-        _make_xcodeprojfolder(path.join(target_dir, target.name..".xcodeproj"), target)
+        _make_xcodeprojfolder(xcode_file, target)
     end
 end
 
@@ -1328,8 +1514,8 @@ function make(outputdir)
             -- reload config, project and platform
             if mode ~= config.mode() or arch ~= config.arch() then
                 -- modify config
-                config.set("mode", mode)
-                config.set("arch", arch)
+                config.set("mode", mode, {force=true})
+                config.set("arch", arch, {force=true})
 
                 project.clear()
 
@@ -1348,7 +1534,7 @@ function make(outputdir)
 
             -- save targets
             for targetname, target in pairs(project.targets()) do
-            	print("checking for the %s.%s.%s ... %s", targetname, mode, arch, target:targetfile())
+            	print("checking for the %s.%s.%s.%s ... %s", targetname, mode, arch, target:get("kind"), target:targetfile())
                 -- make target with the given mode and arch
                 targets[targetname] = targets[targetname] or {}
                 local _target = targets[targetname]

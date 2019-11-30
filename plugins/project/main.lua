@@ -46,6 +46,7 @@ function _make(kind)
     local maps = 
     {
         makefile         = makefile.make
+    ,   mk               = mk.make
     ,   cmakelists       = cmakelists.make
     ,   vs2002           = vs2002.make
     ,   vs2003           = vs2003.make
