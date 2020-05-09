@@ -87,7 +87,9 @@ end
 
 -- make global
 function _make_global(slnfile, vsinfo, nested_folders)
-
+    local function fix_arch(arch)
+        return arch == "x86" and "Win32" or arch
+    end
     -- enter global
     slnfile:enter("Global")
 
@@ -95,7 +97,7 @@ function _make_global(slnfile, vsinfo, nested_folders)
     slnfile:enter("GlobalSection(SolutionConfigurationPlatforms) = preSolution")
     for _, mode in ipairs(vsinfo.modes) do
         for _, arch in ipairs(vsinfo.archs) do
-            slnfile:print("%s|%s = %s|%s", mode, arch, mode, arch)
+            slnfile:print("%s|%s = %s|%s", mode, fix_arch(arch), mode, fix_arch(arch))
         end
     end
     slnfile:leave("EndGlobalSection")
@@ -106,8 +108,8 @@ function _make_global(slnfile, vsinfo, nested_folders)
         if not target:isphony() then
             for _, mode in ipairs(vsinfo.modes) do
                 for _, arch in ipairs(vsinfo.archs) do
-                    slnfile:print("{%s}.%s|%s.ActiveCfg = %s|%s", hash.uuid(targetname), mode, arch, mode, arch)
-                    slnfile:print("{%s}.%s|%s.Build.0 = %s|%s", hash.uuid(targetname), mode, arch, mode, arch)
+                    slnfile:print("{%s}.%s|%s.ActiveCfg = %s|%s", hash.uuid(targetname), mode, fix_arch(arch), mode, fix_arch(arch))
+                    slnfile:print("{%s}.%s|%s.Build.0 = %s|%s", hash.uuid(targetname), mode, fix_arch(arch), mode, fix_arch(arch))
                 end
             end
         end

@@ -263,13 +263,16 @@ function _make_configurations(vcxprojfile, vsinfo, target, vcxprojdir)
     ,   shared = "DynamicLibrary"
     ,   static = "StaticLibrary"
     }
+    local function fix_arch(targetinfo)
+        return targetinfo.arch == "x86" and "Win32" or targetinfo.arch
+    end
 
     -- make ProjectConfigurations
     vcxprojfile:enter("<ItemGroup Label=\"ProjectConfigurations\">")
     for _, targetinfo in ipairs(target.info) do
-        vcxprojfile:enter("<ProjectConfiguration Include=\"%s|%s\">", targetinfo.mode, targetinfo.arch)
+        vcxprojfile:enter("<ProjectConfiguration Include=\"%s|%s\">", targetinfo.mode, fix_arch(targetinfo))
             vcxprojfile:print("<Configuration>%s</Configuration>", targetinfo.mode)
-            vcxprojfile:print("<Platform>%s</Platform>", targetinfo.arch)
+            vcxprojfile:print("<Platform>%s</Platform>", fix_arch(targetinfo))
         vcxprojfile:leave("</ProjectConfiguration>")
     end
     vcxprojfile:leave("</ItemGroup>")
@@ -288,7 +291,7 @@ function _make_configurations(vcxprojfile, vsinfo, target, vcxprojdir)
 
     -- make Configuration
     for _, targetinfo in ipairs(target.info) do
-        vcxprojfile:enter("<PropertyGroup Condition=\"\'%$(Configuration)|%$(Platform)\'==\'%s|%s\'\" Label=\"Configuration\">", targetinfo.mode, targetinfo.arch)
+        vcxprojfile:enter("<PropertyGroup Condition=\"\'%$(Configuration)|%$(Platform)\'==\'%s|%s\'\" Label=\"Configuration\">", targetinfo.mode, fix_arch(targetinfo))
             vcxprojfile:print("<ConfigurationType>%s</ConfigurationType>", assert(configuration_types[target.kind]))
             vcxprojfile:print("<PlatformToolset>%s</PlatformToolset>", _get_toolset_ver(targetinfo, vsinfo))
             vcxprojfile:print("<CharacterSet>%s</CharacterSet>", targetinfo.unicode and "Unicode" or "MultiByte")
@@ -307,7 +310,7 @@ function _make_configurations(vcxprojfile, vsinfo, target, vcxprojdir)
 
     -- make PropertySheets
     for _, targetinfo in ipairs(target.info) do
-        vcxprojfile:enter("<ImportGroup Condition=\"\'%$(Configuration)|%$(Platform)\'==\'%s|%s\'\" Label=\"PropertySheets\">", targetinfo.mode, targetinfo.arch)
+        vcxprojfile:enter("<ImportGroup Condition=\"\'%$(Configuration)|%$(Platform)\'==\'%s|%s\'\" Label=\"PropertySheets\">", targetinfo.mode, fix_arch(targetinfo))
             vcxprojfile:print("<Import Project=\"%$(UserRootDir)\\Microsoft.Cpp.%$(Platform).user.props\" Condition=\"exists(\'%$(UserRootDir)\\Microsoft.Cpp.%$(Platform).user.props\')\" Label=\"LocalAppDataPlatform\" />")
         vcxprojfile:leave("</ImportGroup>")
     end
@@ -317,7 +320,7 @@ function _make_configurations(vcxprojfile, vsinfo, target, vcxprojdir)
 
     -- make OutputDirectory and IntermediateDirectory
     for _, targetinfo in ipairs(target.info) do
-        vcxprojfile:enter("<PropertyGroup Condition=\"\'%$(Configuration)|%$(Platform)\'==\'%s|%s\'\">", targetinfo.mode, targetinfo.arch)
+        vcxprojfile:enter("<PropertyGroup Condition=\"\'%$(Configuration)|%$(Platform)\'==\'%s|%s\'\">", targetinfo.mode, fix_arch(targetinfo))
             vcxprojfile:print("<OutDir>%s\\</OutDir>", path.relative(path.absolute(targetinfo.targetdir), vcxprojdir))
             vcxprojfile:print("<IntDir>%s\\</IntDir>", path.relative(path.absolute(targetinfo.objectdir), vcxprojdir))
             vcxprojfile:print("<TargetName>%s</TargetName>", path.basename(targetinfo.targetfile))
@@ -557,9 +560,11 @@ end
 
 -- make common item 
 function _make_common_item(vcxprojfile, vsinfo, target, targetinfo, vcxprojdir)
-
+    local function fix_arch(targetinfo)
+        return targetinfo.arch == "x86" and "Win32" or targetinfo.arch
+    end
     -- enter ItemDefinitionGroup 
-    vcxprojfile:enter("<ItemDefinitionGroup Condition=\"\'%$(Configuration)|%$(Platform)\'==\'%s|%s\'\">", targetinfo.mode, targetinfo.arch)
+    vcxprojfile:enter("<ItemDefinitionGroup Condition=\"\'%$(Configuration)|%$(Platform)\'==\'%s|%s\'\">", targetinfo.mode, fix_arch(targetinfo))
     
     -- init the linker kinds
     local linkerkinds = 
