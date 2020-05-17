@@ -122,9 +122,9 @@ function _make_compflags(sourcefile, targetinfo, vcxprojdir)
         -- -Fdsymbol.pdb or /Fdsymbol.pdb
         flag = flag:gsub("[%-/]Fd(.*)", function (dir)
                         dir = path.translate(dir:trim())
-                        --if not path.is_absolute(dir) then
+                        if not path.is_absolute(dir) then
                             dir = path.relative(path.absolute(dir), vcxprojdir)
-                        --end
+                        end
                         dir = path.relative(dir, vcxprojdir)
                         return "/Fd" .. dir
                     end)
@@ -440,10 +440,10 @@ function _make_source_options(vcxprojfile, flags, condition)
     vcxprojfile:print("<PreprocessorDefinitions%s>%s</PreprocessorDefinitions>", condition, defstr) 
 
     -- make DebugInformationFormat
-    if flagstr:find("[%-/]Zi") then
-        vcxprojfile:print("<DebugInformationFormat%s>ProgramDatabase</DebugInformationFormat>", condition)
-    elseif flagstr:find("[%-/]ZI") then
+    if flagstr:find("[%-/]ZI") then
         vcxprojfile:print("<DebugInformationFormat%s>EditAndContinue</DebugInformationFormat>", condition)
+    elseif flagstr:find("[%-/]Zi") then
+        vcxprojfile:print("<DebugInformationFormat%s>ProgramDatabase</DebugInformationFormat>", condition)
     elseif flagstr:find("[%-/]Z7") then
         vcxprojfile:print("<DebugInformationFormat%s>OldStyle</DebugInformationFormat>", condition)
     else
