@@ -440,10 +440,10 @@ function _make_source_options(vcxprojfile, flags, condition)
     vcxprojfile:print("<PreprocessorDefinitions%s>%s</PreprocessorDefinitions>", condition, defstr) 
 
     -- make DebugInformationFormat
-    if flagstr:find("[%-/]ZI") then
-        vcxprojfile:print("<DebugInformationFormat%s>EditAndContinue</DebugInformationFormat>", condition)
-    elseif flagstr:find("[%-/]Zi") then
+    if flagstr:find("[%-/]Zi") then
         vcxprojfile:print("<DebugInformationFormat%s>ProgramDatabase</DebugInformationFormat>", condition)
+    elseif flagstr:find("[%-/]ZI") then
+        vcxprojfile:print("<DebugInformationFormat%s>EditAndContinue</DebugInformationFormat>", condition)
     elseif flagstr:find("[%-/]Z7") then
         vcxprojfile:print("<DebugInformationFormat%s>OldStyle</DebugInformationFormat>", condition)
     else
