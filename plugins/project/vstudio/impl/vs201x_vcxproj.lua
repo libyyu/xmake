@@ -778,7 +778,7 @@ function _make_common_items(vcxprojfile, vsinfo, target, vcxprojdir)
                     local flags = _make_compflags(sourcefile, targetinfo, vcxprojdir)
 
                     -- no common flags for asm
-                    if sourcekind ~= "as" then
+                    if sourcekind ~= "as" and sourcekind ~= "mrc"  then
                         for _, flag in ipairs(flags) do
                             flags_stats[flag] = (flags_stats[flag] or 0) + 1
                         end
