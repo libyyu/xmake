@@ -35,6 +35,7 @@ function _get_toolset_ver(targetinfo, vsinfo)
     ,   vs2015 = "v140"
     ,   vs2017 = "v141"
     ,   vs2019 = "v142"
+    ,   vs2022 = "v143"
     }
 
     -- get toolset version from vs version
@@ -69,6 +70,7 @@ function _get_platform_sdkver(target, vsinfo)
         vs2015 = "10.0.10240.0"
     ,   vs2017 = "10.0.14393.0"
     ,   vs2019 = "10.0.17763.0"
+    ,   vs2022 = "10.0.22621.0"
     }
 
     -- get sdk version for vcvarsall[arch].WindowsSDKVersion
@@ -235,6 +237,7 @@ function _make_header(vcxprojfile, vsinfo)
     ,   vs2015 = '14'
     ,   vs2017 = '15'
     ,   vs2019 = '16'
+    ,   vs2022 = '17'
     }
 
     -- make header
@@ -532,7 +535,7 @@ function _make_source_options(vcxprojfile, flags, condition)
         end
         -- warning disables
         if is_warningd then
-            local warndisable = flag:gsub("[%-/]wd\"(.*)\"", function(warn)
+            local warndisable = flag:gsub("[%-/]wd(.*)", function(warn)
                 warn = warn:trim()
                 return warn
             end)
@@ -545,6 +548,7 @@ function _make_source_options(vcxprojfile, flags, condition)
     vcxprojfile:print("<AdditionalIncludeDirectories>%s%%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>", #str_includedirs>0 and str_includedirs..";" or "")
     
     -- make predefinitions
+    table.insert(predefinitions, '_VS_PROJECT_')
     local str_predefinitions = table.concat(predefinitions,";"):trim()
     vcxprojfile:print("<PreprocessorDefinitions>%s%%(PreprocessorDefinitions)</PreprocessorDefinitions>", #str_predefinitions>0 and str_predefinitions..";" or "")
     

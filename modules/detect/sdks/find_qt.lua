@@ -37,11 +37,15 @@ function _find_sdkdir(sdkdir, sdkver)
         table.insert(subdirs, path.join(sdkver or "*", is_arch("x86_64") and "clang_64" or "clang_32", "bin"))
     elseif is_plat("windows") then
         local vs = config.get("vs")
+        local isx64 = "x64" == config.get("arch")
         if vs then
-            table.insert(subdirs, path.join(sdkver or "*", is_arch("x64") and "msvc" .. vs .. "_64" or "msvc" .. vs .. "_32", "bin"))
+            if vs:startswith('vs') then
+                vs = vs:sub(3)
+            end
+            table.insert(subdirs, path.join(sdkver or "*", isx64 and "msvc" .. vs .. "_64" or "msvc" .. vs .. "_32", "bin"))
             table.insert(subdirs, path.join(sdkver or "*", "msvc" .. vs, "bin"))
         end 
-        table.insert(subdirs, path.join(sdkver or "*", is_arch("x64") and "msvc*_64" or "msvc*_32", "bin"))
+        table.insert(subdirs, path.join(sdkver or "*", isx64 and "msvc*_64" or "msvc*_32", "bin"))
         table.insert(subdirs, path.join(sdkver or "*", "msvc*", "bin"))
     elseif is_plat("mingw") then
         table.insert(subdirs, path.join(sdkver or "*", is_arch("x86_64") and "mingw*_64" or "mingw*_32", "bin"))
@@ -152,15 +156,25 @@ function main(sdkdir, opt)
     -- init arguments
     opt = opt or {}
 
+    local isGenProj = config.get("genproj")
+
     -- attempt to load cache first
     local key = "detect.sdks.find_qt"
+    if is_plat("windows") then
+        key = key .. (config.get("arch") and "." .. config.get("arch") or "")
+    end 
     local cacheinfo = cache.load(key)
     if not opt.force and cacheinfo.qt and cacheinfo.qt.sdkdir and os.isdir(cacheinfo.qt.sdkdir) then
         return cacheinfo.qt
     end
-       
+
+    if not config.get("__qt__rootdir") then
+        local sdkdir = sdkdir or config.get("qt") or global.get("qt") or config.get("sdk")
+        config.set("__qt__rootdir", sdkdir, {force = true, readonly = true})
+    end
+
     -- find qt
-    local qt = _find_qt(sdkdir or config.get("qt") or global.get("qt") or config.get("sdk"), opt.version or config.get("qt_sdkver"))
+    local qt = _find_qt(isGenProj and config.get("__qt__rootdir") or (sdkdir or config.get("qt") or global.get("qt") or config.get("sdk")), opt.version or config.get("qt_sdkver"))
     if qt then
 
         -- save to config

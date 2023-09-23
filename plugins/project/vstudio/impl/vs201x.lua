@@ -211,6 +211,8 @@ function make(outputdir, vsinfo)
     -- init archs
     vsinfo.archs = _make_vsinfo_archs()
 
+    config.set("genproj", true, {readonly = true, force = true})
+
     -- load targets
     local targets = {}
     for mode_idx, mode in ipairs(vsinfo.modes) do

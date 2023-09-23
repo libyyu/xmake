@@ -23,7 +23,7 @@ import("core.project.config")
 import("core.project.target")
 
 -- make link for framework
-function _link(framework, major)
+function _link(framework, major, mode)
     if major and framework:startswith("Qt") then
         local debug_suffix = "_debug"
         if is_plat("windows") then
@@ -31,13 +31,13 @@ function _link(framework, major)
         elseif is_plat("android") then
             debug_suffix = ""
         end
-        framework = "Qt" .. major .. framework:sub(3) .. (is_mode("debug") and debug_suffix or "")
+        framework = "Qt" .. major .. framework:sub(3) .. (mode == "debug" and debug_suffix or "") --is_mode("debug")
     end
     return framework
 end
 
 -- find the static links from the given qt link directories, e.g. libqt*.a
-function _find_static_links(linkdirs, libpattern)
+function _find_static_links(linkdirs, libpattern, mode)
     local links = {}
     local debug_suffix = "_debug"
     if is_plat("windows") then
@@ -48,7 +48,7 @@ function _find_static_links(linkdirs, libpattern)
     for _, linkdir in ipairs(linkdirs) do
         for _, libpath in ipairs(os.files(path.join(linkdir, libpattern))) do
             local basename = path.basename(libpath)
-            if (is_mode("debug") and basename:endswith(debug_suffix)) or not basename:endswith(debug_suffix) then
+            if (mode == "debug" and basename:endswith(debug_suffix)) or (mode ~= "debug" and not basename:endswith(debug_suffix)) then
                 table.insert(links, target.linkname(path.filename(libpath)))
             end
         end
@@ -150,11 +150,11 @@ function main(target, opt)
                     target:add("includedirs", path.join(frameworkdir, "Headers"))
                     useframeworks = true
                 else
-                    target:add("links", _link(framework, major))
+                    target:add("links", _link(framework, major, config.get("mode")))
                     target:add("includedirs", path.join(qt.sdkdir, "include", framework))
                 end
             else 
-                target:add("links", _link(framework, major))
+                target:add("links", _link(framework, major, config.get("mode")))
                 target:add("includedirs", path.join(qt.sdkdir, "include", framework))
             end
         end
@@ -196,6 +196,14 @@ function main(target, opt)
         target:add("includedirs", path.join(qt.sdkdir, "mkspecs/win32-msvc"))
         target:add("linkdirs", qt.linkdirs)
         target:add("syslinks", "ws2_32", "gdi32", "ole32", "advapi32", "shell32", "user32", "OpenGL32", "imm32", "winmm")
+        if config.get("genproj") then
+            local bindir = qt.bindir
+            if is_plat("windows") then
+                target:add("defines", "QT_BIN_DIR=\"" .. bindir:gsub("\\", "\\\\") .. "\"")
+            else
+                target:add("defines", "QT_BIN_DIR=\"" .. bindir .. "\"")
+            end
+        end
     elseif is_plat("mingw") then
         target:set("frameworks", nil)
         target:add("includedirs", path.join(qt.sdkdir, "include"))
@@ -211,6 +219,6 @@ function main(target, opt)
     end
 
     -- add some static third-party links if exists
-    target:add("links", _find_static_links(qt.linkdirs, is_plat("windows") and "qt*.lib" or "libqt*.a"))
+    target:add("links", _find_static_links(qt.linkdirs, is_plat("windows") and "qt*.lib" or "libqt*.a", config.get("mode")))
 end
 

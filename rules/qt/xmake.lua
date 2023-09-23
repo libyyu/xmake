@@ -50,6 +50,22 @@ rule("qt.shared")
         import("load")(target, {frameworks = {"QtCore"}})
     end)
 
+-- define rule: qt shared library
+rule("qt.widgets.shared")
+
+    -- add rules
+    add_deps("qt.qrc", "qt.ui", "qt.moc")
+
+    -- we must set kind before target.on_load(), may we will use target in on_load()
+    before_load(function (target)
+        target:set("kind", "shared")
+    end)
+
+    -- after load
+    after_load(function (target)
+        import("load")(target, {frameworks = {"QtCore", "QtGui", "QtWidgets"}})
+    end)
+
 -- define rule: qt console
 rule("qt.console")
 

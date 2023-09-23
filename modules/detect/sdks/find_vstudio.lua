@@ -124,7 +124,8 @@ function main(opt)
     -- init vsvers
     local vsvers = 
     {
-        ["16.0"] = "2019"
+        ["17.0"] = "2022"
+    ,   ["16.0"] = "2019"
     ,   ["15.0"] = "2017"
     ,   ["14.0"] = "2015"
     ,   ["12.0"] = "2013"
@@ -142,7 +143,8 @@ function main(opt)
     -- init vsenvs
     local vsenvs = 
     {
-        ["14.0"] = "VS140COMNTOOLS"
+        ["14.3"] = "VS143COMNTOOLS"
+    ,   ["14.0"] = "VS140COMNTOOLS"
     ,   ["12.0"] = "VS120COMNTOOLS"
     ,   ["11.0"] = "VS110COMNTOOLS"
     ,   ["10.0"] = "VS100COMNTOOLS"
